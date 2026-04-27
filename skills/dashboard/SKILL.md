@@ -10,7 +10,7 @@ description: >
 
 Run:
 ```bash
-node $CLAUDE_PLUGIN_ROOT/scripts/dashboard.js
+node "$(ls -d ~/.claude/plugins/cache/ai-gentik/desire-path/*/ | sort -V | tail -1)scripts/dashboard.js"
 ```
 
 Opens `~/.claude/desire-path/dashboard.html` in the browser automatically.
