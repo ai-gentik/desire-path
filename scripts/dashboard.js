@@ -605,7 +605,7 @@ buildPatterns();
 buildInventory();
 </script>
 </body>
-</html>\`;
+</html>`;
 
 fs.mkdirSync(DIR, { recursive: true });
 fs.writeFileSync(OUT, html);
