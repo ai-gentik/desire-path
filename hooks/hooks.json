@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DP_EVENT=UserPromptSubmit node $PLUGIN_DIR/scripts/logger.js",
+            "command": "DP_EVENT=UserPromptSubmit node $CLAUDE_PLUGIN_ROOT/scripts/logger.js",
             "async": true,
             "timeout": 3
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DP_EVENT=PostToolUse node $PLUGIN_DIR/scripts/logger.js",
+            "command": "DP_EVENT=PostToolUse node $CLAUDE_PLUGIN_ROOT/scripts/logger.js",
             "async": true,
             "timeout": 3
           }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DP_EVENT=InstructionsLoaded node $PLUGIN_DIR/scripts/logger.js",
+            "command": "DP_EVENT=InstructionsLoaded node $CLAUDE_PLUGIN_ROOT/scripts/logger.js",
             "async": true,
             "timeout": 3
           }
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DP_EVENT=Stop node $PLUGIN_DIR/scripts/logger.js",
+            "command": "DP_EVENT=Stop node $CLAUDE_PLUGIN_ROOT/scripts/logger.js",
             "async": true,
             "timeout": 5,
             "_comment": "Flush session to disk. Async so it never delays response."
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $PLUGIN_DIR/scripts/checker.js",
+            "command": "node $CLAUDE_PLUGIN_ROOT/scripts/checker.js",
             "timeout": 12,
             "_comment": "BLOCKING. Runs after logger. If a pattern is ready, outputs JSON {decision:'block', reason:'...'} which tells Claude to surface a suggestion proactively instead of stopping. Silent when no pattern ready (exits 0 with no output)."
           }
