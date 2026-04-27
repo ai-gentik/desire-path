@@ -56,7 +56,7 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 |---|---|---|
 | `UserPromptSubmit` | async | Logs prompts, detects suggestion acceptance |
 | `PostToolUse` | async | Logs tools, skill invocations, hook executions |
-| `SkillLoad` | async | Tracks which skills auto-load |
+| `InstructionsLoaded` | async | Tracks which skills auto-load |
 | `Stop` #1 | async | Flushes session, compacts files if needed |
 | `Stop` #2 | blocking | Pattern check — blocks Claude only if suggestion ready |
 
