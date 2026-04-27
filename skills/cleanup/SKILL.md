@@ -12,7 +12,7 @@ description: >
 
 Run:
 ```bash
-node $PLUGIN_DIR/../../scripts/inventory.js
+node $CLAUDE_PLUGIN_ROOT/scripts/inventory.js
 ```
 
 Then read `~/.claude/desire-path/inventory.json` for the full artifact list.

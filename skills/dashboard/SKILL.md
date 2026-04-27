@@ -10,7 +10,7 @@ description: >
 
 Run:
 ```bash
-node $PLUGIN_DIR/../../scripts/dashboard.js
+node $CLAUDE_PLUGIN_ROOT/scripts/dashboard.js
 ```
 
 Opens `~/.claude/desire-path/dashboard.html` in the browser automatically.
