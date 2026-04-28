@@ -13,5 +13,6 @@ Run:
 node "$(ls -d ~/.claude/plugins/cache/ai-gentik/desire-path/*/ | sort -V | tail -1)scripts/dashboard.js"
 ```
 
-Opens `~/.claude/desire-path/dashboard.html` in the browser automatically.
+The script opens `~/.claude/desire-path/dashboard.html` in the browser automatically.
+Do NOT run a separate `open` command — the script already handles this.
 If the browser doesn't open, tell the user the path to open manually.
