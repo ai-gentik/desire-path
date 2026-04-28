@@ -50,6 +50,18 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $CLAUDE_PLUGIN_ROOT/scripts/server.js &",
+            "async": true,
+            "timeout": 3,
+            "_comment": "Start live dashboard server if not already running. Idempotent — exits silently if port 2337 is already bound."
+          }
+        ]
       }
     ],
     "Stop": [
