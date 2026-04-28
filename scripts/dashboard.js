@@ -477,6 +477,8 @@ const fmt = (iso)=>{
   if(diff<30) return diff+"d";
   return Math.round(diff/7)+"w";
 };
+const TYPE_COLOR = {skill:'var(--signal)',hook:'var(--good)',agent:'#9a8db3',claude_md:'var(--signal-dim)',command:'var(--ink-2)',plugin:'var(--ink-2)'};
+const typeCol = (t)=>TYPE_COLOR[t]||'var(--muted)';
 
 document.getElementById("big-total").textContent = D.totalSessions;
 document.getElementById("big-sub").textContent = D.archiveSessions+" arc · "+D.hotSessions+" hot";
@@ -558,7 +560,7 @@ function buildOverview(){
   const pavedRows = D.paved.length ? D.paved.map(p=>\`
     <tr>
       <td><span class="dot-mini dm-\${p.type}"></span><span class="t-name">\${p.name}</span></td>
-      <td><span class="t-type">\${p.type}</span></td>
+      <td><span class="t-type" style="color:\${typeCol(p.type)}">\${p.type}</span></td>
       <td class="r"><span class="trend">\${trendCells(p.uses)}</span></td>
       <td class="r"><span class="t-num \${p.uses?'':'zero'}">\${p.uses}</span></td>
       <td class="r"><span class="t-when">\${fmt(p.last_used)}</span></td>
@@ -855,7 +857,7 @@ function buildSignals(){
   const bashRows = D.bashCmds.length ? D.bashCmds.map(([cmd,n])=>\`
     <tr>
       <td><code class="t-name" style="font-size:11px">\${cmd.length>72?cmd.substring(0,69)+'…':cmd}</code></td>
-      <td class="r"><span class="p-tag" style="font-size:9px">\${bashTag(cmd)}</span></td>
+      <td class="r"><span class="t-type" style="color:\${typeCol(bashTag(cmd)==='skill'?'skill':'hook')}">\${bashTag(cmd)}</span></td>
       <td class="r"><span class="t-num">\${n}</span> <span style="color:var(--muted);font-size:10px">sess</span></td>
     </tr>\`).join('') : '<tr><td colspan="3"><div class="empty">No repeated bash commands yet.</div></td></tr>';
 
@@ -898,7 +900,7 @@ function buildPatterns(){
       <div>
         <div class="p-quote">\${p.description||p.desc||''}</div>
         <div class="p-meta">
-          <span class="p-tag">\${p.type||'pattern'}</span>
+          <span class="t-type" style="color:\${typeCol(p.type)}">\${p.type||'pattern'}</span>
           <span class="p-trigger">trigger · <b>\${p.suggested_artifact?.trigger||p.tag||'—'}</b></span>
         </div>
       </div>
@@ -912,14 +914,12 @@ function buildPatterns(){
       </div>
     </div>\`).join("") : '<div class="empty">Patterns emerge after 5+ sessions.</div>';
 
-  const dotColor = (t)=>({skill:'var(--signal)',hook:'var(--good)',agent:'#9a8db3',claude_md:'var(--signal-dim)',command:'var(--muted)',plugin:'var(--ink-2)'})[t]||'var(--muted)';
-
   const sugs = D.suggestions.length ? D.suggestions.slice().reverse().map(s=>\`
     <div class="log-row">
       <span class="log-time">\${(s.at||s.date||'').slice(0,10)}</span>
-      <span class="log-dot" style="background:\${dotColor(s.pattern?.type||s.type)}"></span>
+      <span class="log-dot" style="background:\${typeCol(s.pattern?.type||s.type)}"></span>
       <span class="log-msg">\${s.pattern?.description||s.pattern?.hint||s.desc||''}</span>
-      <span class="log-type">\${s.pattern?.type||s.type||''}</span>
+      <span class="log-type" style="color:\${typeCol(s.pattern?.type||s.type)}">\${s.pattern?.type||s.type||''}</span>
       <span class="log-out \${s.outcome}">\${s.outcome}</span>
     </div>\`).join("") : '<div class="empty">No suggestions made yet.</div>';
 
@@ -950,7 +950,6 @@ function buildInventory(){
   const order = {active:0,growing:1,stale:2,dead:3};
   const sorted = [...inv].sort((a,b)=>(order[a.status]??9)-(order[b.status]??9) || (b.uses||0)-(a.uses||0));
 
-  const typeColor = {skill:'var(--signal)',hook:'var(--good)',agent:'#9a8db3',claude_md:'var(--signal-dim)',command:'var(--ink-2)',plugin:'var(--ink-2)'};
   const shortName = (a)=>{
     if(a.type!=='hook') return a.name;
     const cmd = a.command||'';
@@ -968,7 +967,7 @@ function buildInventory(){
     return sep + \`
       <tr class="\${isDead?'dead':''}">
         <td><span class="dot-mini dm-\${a.type}"></span><span class="t-name" title="\${a.name}">\${shortName(a)}</span></td>
-        <td><span class="t-type" style="color:\${typeColor[a.type]||'var(--muted)'}">\${a.type}</span></td>
+        <td><span class="t-type" style="color:\${typeCol(a.type)}">\${a.type}</span></td>
         <td><span class="t-type">\${a.scope||''}</span></td>
         <td class="r"><span class="t-num \${a.uses?'':'zero'}">\${a.uses||0}×</span></td>
         <td class="r"><span class="t-when">\${fmt(a.last_used||a.last)} · \${a.age||0}d old</span></td>
