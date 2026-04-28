@@ -55,6 +55,15 @@ sessions.forEach(s=>{if(s.at){const k=s.at.slice(0,10);if(k in dayMap)dayMap[k]+
 const hourMap = Array(24).fill(0);
 sessions.forEach(s=>{if(s.at)hourMap[new Date(s.at).getHours()]++;});
 
+// Weekday × hour heatmap (7 days × 24 hours), 0=Mon … 6=Sun
+const heatGrid = Array.from({length:7},()=>Array(24).fill(0));
+sessions.forEach(s=>{
+  if(!s.at)return;
+  const d = new Date(s.at);
+  const dow = (d.getDay()+6)%7; // convert Sun=0 to Mon=0
+  heatGrid[dow][d.getHours()]++;
+});
+
 const usageByArtifact = {...usageTotals};
 usageRaw.forEach(u=>{
   if(!u.artifact_name)return;
@@ -100,6 +109,7 @@ const DATA = {
   activity: Object.values(dayMap),
   activityDates: Object.keys(dayMap),
   hours: hourMap,
+  heatGrid,
   tools: topTools,
   skills: topSkills,
   paved: pavedEnriched,
@@ -197,8 +207,8 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .panel-meta{font-size:10px;color:var(--muted);letter-spacing:.04em}
 
 .bars{display:flex;flex-direction:column;gap:6px}
-.bar-row{display:grid;grid-template-columns:88px 1fr 36px;gap:10px;align-items:center}
-.bar-name{font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.bar-row{display:grid;grid-template-columns:130px 1fr 36px;gap:10px;align-items:center}
+.bar-name{font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;cursor:default}
 .bar-track{height:14px;position:relative;border-bottom:1px solid var(--line)}
 .bar-track-inner{position:absolute;inset:auto 0 0 0;height:6px;display:flex;gap:1px;align-items:flex-end}
 .bar-cell{flex:1;background:var(--ink-2);opacity:.3}
@@ -213,6 +223,13 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .heat-wide .h{background:var(--signal-dim);min-height:1px}
 .heat-wide .h.peak{background:var(--signal)}
 .heat-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:9px;color:var(--faint);letter-spacing:.08em}
+
+.wk-heatmap{display:grid;grid-template-columns:32px repeat(24,1fr);gap:1px}
+.wk-row{display:contents}
+.wk-label{font-size:9px;color:var(--muted);display:flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;padding-right:4px;justify-content:flex-end}
+.wk-cell{height:14px;background:var(--panel-2);cursor:default}
+.wk-axis{display:grid;grid-template-columns:32px repeat(24,1fr);gap:1px;margin-top:4px}
+.wk-axis-lbl{font-size:9px;color:var(--faint);text-align:center;letter-spacing:.04em}
 
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
 .tbl thead th{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
@@ -428,14 +445,14 @@ function buildOverview(){
 
   const toolBars = D.tools.length ? D.tools.map(([n,v])=>\`
     <div class="bar-row">
-      <span class="bar-name">\${n}</span>
+      <span class="bar-name" title="\${n}">\${n}</span>
       <div class="bar-track"><div class="bar-track-inner">\${cellsForVal(v,maxTool)}</div></div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No tool data yet.</div>';
 
   const skillBars = D.skills.length ? D.skills.map(([n,v])=>\`
     <div class="bar-row">
-      <span class="bar-name">\${n}</span>
+      <span class="bar-name" title="\${n}">\${n}</span>
       <div class="bar-track"><div class="bar-track-inner">\${cellsForVal(v,maxSkill)}</div></div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
@@ -457,6 +474,19 @@ function buildOverview(){
     const isPeak = v===maxDay && v>0;
     return \`<div class="col \${isPeak?'peak':''}" title="\${D.activityDates[i]}: \${v} session\${v!==1?'s':''}" style="height:\${Math.max(2,Math.round(v/maxDay*112))}px">\${dayLabels[i]?\`<span class="lbl">\${dayLabels[i]}</span>\`:""}</div>\`;
   }).join("");
+
+  const maxCell = Math.max(...D.heatGrid.flat(), 1);
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const wkRows = D.heatGrid.map((row, di)=>{
+    const cells = row.map((v,hi)=>{
+      const op = v===0 ? 0.06 : Math.max(0.18, v/maxCell);
+      const col = v>=maxCell*0.8 && v>0 ? 'var(--signal)' : 'var(--signal)';
+      const hr = String(hi).padStart(2,'0');
+      return \`<div class="wk-cell" title="\${days[di]} \${hr}:00 — \${v} session\${v!==1?'s':''}" style="background:\${col};opacity:\${op.toFixed(2)}"></div>\`;
+    }).join('');
+    return \`<div class="wk-row"><div class="wk-label">\${days[di]}</div>\${cells}</div>\`;
+  }).join('');
+  const wkAxisLabels = [0,6,12,18,23].map(h=>\`<div class="wk-axis-lbl" style="grid-column:\${h+2}">\${String(h).padStart(2,'0')}</div>\`).join('');
 
   const trendCells = (uses)=>Array.from({length:8},(_,i)=>{
     const h = Math.max(20, Math.min(100, (uses*7+i*11)%100));
@@ -494,6 +524,11 @@ function buildOverview(){
         <div class="heat-wide">\${heat}</div>
         <div class="heat-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       </div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><div class="panel-title">Activity · Weekday × Hour</div><div class="panel-meta">hot sessions only · darker = more activity</div></div>
+      <div class="wk-heatmap">\${wkRows}</div>
+      <div class="wk-axis"><div></div>\${wkAxisLabels}</div>
     </div>
     <div class="panel" style="padding:0">
       <div class="panel-head" style="padding:18px 20px">
