@@ -259,8 +259,10 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .panel-meta{font-size:10px;color:var(--muted);letter-spacing:.04em}
 
 .bars{display:flex;flex-direction:column;gap:6px}
-.bar-row{display:grid;grid-template-columns:130px 1fr 36px;gap:10px;align-items:center}
+.bar-row{display:grid;grid-template-columns:160px 1fr 36px;gap:10px;align-items:center}
 .bar-name{font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;cursor:default}
+.bar-ns{color:var(--faint);font-size:10px}
+.bar-cmd{color:var(--ink-2)}
 .bar-track{height:8px;position:relative;background:var(--panel-2);border-radius:1px;overflow:hidden}
 .bar-fill{height:100%;background:var(--signal);border-radius:1px;transition:width .3s ease}
 .bar-val{font-size:11px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
@@ -611,16 +613,24 @@ function buildOverview(){
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No tool data yet.</div>';
 
+  const splitName = (n, prefix='') => {
+    const colon = n.lastIndexOf(':');
+    if (colon === -1) return \`<span class="bar-name" title="\${prefix}\${n}">\${prefix}\${n}</span>\`;
+    const ns = prefix + n.slice(0, colon + 1);
+    const cmd = n.slice(colon + 1);
+    return \`<span class="bar-name" title="\${prefix}\${n}"><span class="bar-ns">\${ns}</span><span class="bar-cmd">\${cmd}</span></span>\`;
+  };
+
   const skillBars = D.skills.length ? D.skills.map(([n,v])=>\`
     <div class="bar-row">
-      <span class="bar-name" title="\${n}">\${n}</span>
+      \${splitName(n)}
       <div class="bar-track">\${barFill(v,maxSkill)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
 
   const cmdBars = D.commands.length ? D.commands.map(([n,v])=>\`
     <div class="bar-row">
-      <span class="bar-name" title="/\${n}">/\${n}</span>
+      \${splitName(n, '/')}
       <div class="bar-track">\${barFill(v,maxCmd)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No slash commands yet.</div>';
@@ -707,12 +717,22 @@ function buildMap(){
     claude_md:'#c8a96a', command:'#a89776', plugin:'#bfb6a3'
   };
 
-  // Combine paved + dead/stale inventory items so the map shows the full landscape.
+  // Combine paved + dead/stale inventory items + session-tracked skills (plugin skills never in paved)
   const paved = D.paved||[];
   const inv = D.inventory||[];
   const extraDead = inv.filter(a=>['dead','stale'].includes(a.status) && !paved.find(p=>p.name===a.name))
     .map(a=>({...a, uses:a.uses||0, last_used:a.last_used||a.last, working:false, _ghost:a.status}));
-  const allArtifacts = [...paved, ...extraDead];
+  const knownNames = new Set([...paved.map(p=>p.name), ...extraDead.map(a=>a.name)]);
+  const sessionSkills = (D.skills||[])
+    .filter(([n])=>!knownNames.has(n))
+    .map(([n,uses])=>({name:n, type:'skill', uses, working:true, scope:'plugin', last_used:null, age:0}));
+  const sessionCmds = (D.commands||[])
+    .filter(([n])=>!knownNames.has(n))
+    .map(([n,uses])=>({name:n, type:'command', uses, working:true, scope:'plugin', last_used:null, age:0}));
+  const sessionAgents = (D.agents||[])
+    .filter(([n])=>!knownNames.has(n))
+    .map(([n,uses])=>({name:n, type:'agent', uses, working:true, scope:'plugin', last_used:null, age:0}));
+  const allArtifacts = [...paved, ...extraDead, ...sessionSkills, ...sessionCmds, ...sessionAgents];
 
   // Detected-but-not-paved patterns become dashed "desire lines"
   let desireLines = (D.patterns||[]).filter(p=>{
@@ -791,7 +811,8 @@ function buildMap(){
     const ey = cy + Math.sin(angle)*r*0.78;
     const path = trail(cx, cy, ex, ey, 1.4);
     const label = p.description || p.desc || p.suggested_artifact?.trigger || 'unnamed';
-    const labelShort = label.length>32 ? label.slice(0,29)+'…' : label;
+    const typeLabel = p.type || p.suggested_artifact?.name || '';
+    const labelShort = typeLabel || (label.length>22 ? label.slice(0,20)+'…' : label);
     const tipPayload = encodeURIComponent(JSON.stringify({
       kind:'desire', name:label, type:p.type||'pattern', frequency:p.frequency||p.freq||'?',
       trigger:p.suggested_artifact?.trigger||''
@@ -847,7 +868,8 @@ function buildMap(){
     const ly = y + Math.sin(angle)*labelDist;
     const anchor = Math.cos(angle) > 0.2 ? 'start' : Math.cos(angle) < -0.2 ? 'end' : 'middle';
 
-    const nameShort = a.name.length>22 ? a.name.slice(0,20)+'…' : a.name;
+    const colonIdx = a.name.lastIndexOf(':');
+    const nameShort = colonIdx !== -1 ? a.name.slice(colonIdx + 1) : (a.name.length>22 ? a.name.slice(0,20)+'…' : a.name);
     const nameStyle = ghost==='dead' ? \`text-decoration:line-through;fill:oklch(0.50 0.03 80)\` : '';
     const status = ghost || (a.working ? 'walked' : 'paved');
 
