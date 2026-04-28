@@ -78,8 +78,10 @@ const acceptRate = totalSuggestions>0?Math.round(accepted/totalSuggestions*100):
 const workingPaths = pavedEnriched.filter(p=>p.working).length;
 
 const allSuggestions = [...suggestions];
-if(lastSuggest?.pattern && !suggestions.find(s=>s.at===lastSuggest.at)){
-  allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
+if(lastSuggest?.pattern){
+  const desc = lastSuggest.pattern.description;
+  const alreadyLogged = suggestions.find(s=>s.pattern?.description===desc);
+  if(!alreadyLogged) allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
 }
 
 // ── Inject data into HTML ─────────────────────────────────────────────────────
@@ -207,7 +209,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .spark-big .col{flex:1;background:var(--ink-2);position:relative;min-height:2px}
 .spark-big .col.peak{background:var(--signal)}
 .spark-big .col .lbl{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--faint);white-space:nowrap}
-.heat-wide{display:grid;grid-template-columns:repeat(24,1fr);gap:1px;height:32px;align-items:end}
+.heat-wide{display:grid;grid-template-columns:repeat(24,1fr);gap:1px;height:120px;align-items:end}
 .heat-wide .h{background:var(--signal-dim);min-height:1px}
 .heat-wide .h.peak{background:var(--signal)}
 .heat-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:9px;color:var(--faint);letter-spacing:.08em}
@@ -438,9 +440,13 @@ function buildOverview(){
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
 
-  const heat = D.hours.map(v=>{
+  const heat = D.hours.map((v,i)=>{
     const peak = v>=maxHour*0.8 && v>0;
-    return \`<div class="h \${peak?'peak':''}" style="height:\${Math.max(2,Math.round(v/maxHour*30))}px;opacity:\${v===0?.15:.4+v/maxHour*.6}"></div>\`;
+    const off = i<6||i>=22;
+    const bg = peak?'var(--signal)':off?'oklch(0.45 0.03 240)':'var(--signal-dim)';
+    const op = (v===0?(off?.06:.15):(off?Math.min(.35,.2+v/maxHour*.3):.4+v/maxHour*.6)).toFixed(2);
+    const hr = String(i).padStart(2,'0');
+    return \`<div class="h" title="\${v} session\${v!==1?'s':''} at \${hr}:00" style="height:\${Math.max(2,Math.round(v/maxHour*112))}px;background:\${bg};opacity:\${op}"></div>\`;
   }).join("");
 
   const dayLabels = D.activityDates.map((d,i)=>{
@@ -449,7 +455,7 @@ function buildOverview(){
   });
   const bigSpark = D.activity.map((v,i)=>{
     const isPeak = v===maxDay && v>0;
-    return \`<div class="col \${isPeak?'peak':''}" style="height:\${Math.max(2,Math.round(v/maxDay*112))}px">\${dayLabels[i]?\`<span class="lbl">\${dayLabels[i]}</span>\`:""}</div>\`;
+    return \`<div class="col \${isPeak?'peak':''}" title="\${D.activityDates[i]}: \${v} session\${v!==1?'s':''}" style="height:\${Math.max(2,Math.round(v/maxDay*112))}px">\${dayLabels[i]?\`<span class="lbl">\${dayLabels[i]}</span>\`:""}</div>\`;
   }).join("");
 
   const trendCells = (uses)=>Array.from({length:8},(_,i)=>{
@@ -562,6 +568,15 @@ function buildInventory(){
   const order = {active:0,growing:1,stale:2,dead:3};
   const sorted = [...inv].sort((a,b)=>(order[a.status]??9)-(order[b.status]??9) || (b.uses||0)-(a.uses||0));
 
+  const typeColor = {skill:'var(--signal)',hook:'var(--good)',agent:'#9a8db3',claude_md:'var(--signal-dim)',command:'var(--ink-2)',plugin:'var(--ink-2)'};
+  const shortName = (a)=>{
+    if(a.type!=='hook') return a.name;
+    const cmd = a.command||'';
+    const tokens = cmd.split(' ');
+    const pathToken = tokens.slice().reverse().find(t=>(t.startsWith('/')||t.startsWith('~/'))&&/[.][a-z]+$/.test(t.replace(/[;|&]/g,'')));
+    const base = pathToken ? pathToken.split('/').pop().replace(/[;|&'"]/g,'') : tokens[0];
+    return (a.event||'hook')+' → '+base;
+  };
   let prevStatus = null;
   const rows = sorted.map(a=>{
     const isDead = a.status==='dead';
@@ -570,8 +585,8 @@ function buildInventory(){
     prevStatus = a.status;
     return sep + \`
       <tr class="\${isDead?'dead':''}">
-        <td><span class="dot-mini dm-\${a.type}"></span><span class="t-name">\${a.name}</span></td>
-        <td><span class="t-type">\${a.type}</span></td>
+        <td><span class="dot-mini dm-\${a.type}"></span><span class="t-name" title="\${a.name}">\${shortName(a)}</span></td>
+        <td><span class="t-type" style="color:\${typeColor[a.type]||'var(--muted)'}">\${a.type}</span></td>
         <td><span class="t-type">\${a.scope||''}</span></td>
         <td class="r"><span class="t-num \${a.uses?'':'zero'}">\${a.uses||0}×</span></td>
         <td class="r"><span class="t-when">\${fmt(a.last_used||a.last)} · \${a.age||0}d old</span></td>

@@ -116,6 +116,27 @@ function detect(sessions) {
     });
   }
 
+  // 5. BASH command repeated across sessions — candidate for alias/skill/hook
+  const bashFreq = {};
+  sessions.forEach(s => {
+    (s.top_bash || []).forEach(([cmd, n]) => {
+      bashFreq[cmd] = (bashFreq[cmd] || 0) + n;
+    });
+  });
+  const topBash = Object.entries(bashFreq).sort((a,b) => b[1]-a[1])[0];
+  if (topBash && topBash[1] >= 4) {
+    const [cmd, count] = topBash;
+    const short = cmd.length > 60 ? cmd.substring(0, 57) + '...' : cmd;
+    results.push({
+      type: 'skill',
+      confidence: count >= 8 ? 'high' : 'medium',
+      frequency: count,
+      description: `You keep running \`${short}\` (${count}×) — a /command or hook would eliminate the repetition`,
+      artifact: 'skill',
+      action: 'run /desire-path:suggest to pave it'
+    });
+  }
+
   // Return highest-confidence result
   const byConf = { high: 3, medium: 2, low: 1 };
   return results.sort((a,b) => (byConf[b.confidence]||0) - (byConf[a.confidence]||0))[0] || null;
@@ -126,7 +147,7 @@ async function claudeRefine(sessions, localPattern) {
   if (!key) return localPattern;
 
   const summary = sessions.slice(-10).map((s,i) =>
-    `[${i+1}] tools:${JSON.stringify(s.tools)} skills:[${(s.skills||[]).join(',')}] prompts:"${(s.prompts||[]).map(p=>p.p?.substring(0,50)).join(' | ')}"`
+    `[${i+1}] tools:${JSON.stringify(s.tools)} skills:[${(s.skills||[]).join(',')}] bash:${JSON.stringify((s.top_bash||[]).slice(0,3))} prompts:"${(s.prompts||[]).map(p=>p.p?.substring(0,50)).join(' | ')}"`
   ).join('\n');
 
   const body = JSON.stringify({

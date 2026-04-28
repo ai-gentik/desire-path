@@ -137,11 +137,12 @@ try {
   } catch {}
 
   // Session state
-  let state = { session_id: null, started_at: null, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [] };
+  let state = { session_id: null, started_at: null, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   try { state = loadJSON(STATE, state); } catch {}
   if (state.session_id !== sid) {
-    state = { session_id: sid, started_at: now, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [] };
+    state = { session_id: sid, started_at: now, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   }
+  if (!state.bash_cmds) state.bash_cmds = {};
 
   // ── PostToolUse ─────────────────────────────────────────────────────────────
   if (event === 'PostToolUse') {
@@ -170,6 +171,8 @@ try {
 
     if (tool === 'Bash') {
       const cmd = hook.tool_input?.command || '';
+      const sig = cmd.trim().substring(0, 120);
+      if (sig) state.bash_cmds[sig] = (state.bash_cmds[sig] || 0) + 1;
       Object.keys(pavedMap).forEach(name => {
         if (pavedMap[name] === 'hook' && cmd.includes(name)) {
           fs.appendFileSync(USAGE, JSON.stringify({
@@ -209,11 +212,16 @@ try {
 
   // ── Stop: flush + compact ───────────────────────────────────────────────────
   if (event === 'Stop') {
+    const topBash = Object.entries(state.bash_cmds)
+      .filter(([,n]) => n >= 2)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, 5);
     fs.appendFileSync(SESSIONS, JSON.stringify({
       sid, at: now, started: state.started_at,
       tools: state.tools, skills: state.skills,
       prompts: state.prompts, turns: state.turns,
-      paved_used: state.paved_used
+      paved_used: state.paved_used,
+      top_bash: topBash
     }) + '\n');
 
     // Self-compact — runs in same process, no extra spawn
