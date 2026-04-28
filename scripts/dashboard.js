@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * desire-path: dashboard generator v4 — Observatory edition
+ * desire-path: dashboard module — Observatory edition
  *
- * Reads all data files, injects as JSON into a self-contained HTML file,
- * opens in browser. The HTML uses vanilla JS so no build step needed.
+ * Exports renderDashboard() which reads all data files and returns
+ * a self-contained HTML string. Used by server.js to serve live.
  */
 
 const fs   = require('fs');
@@ -12,7 +12,6 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const DIR = path.join(os.homedir(), '.claude', 'desire-path');
-const OUT = path.join(DIR, 'dashboard.html');
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 function lines(file) {
@@ -22,6 +21,8 @@ function lines(file) {
 function json(file, fb) {
   try { return JSON.parse(fs.readFileSync(file,'utf8')); } catch { return fb; }
 }
+
+function renderDashboard() {
 
 // First run inventory scan so data is fresh
 try {
@@ -177,6 +178,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="60">
 <title>Desire Path · Observatory</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,400&display=swap" rel="stylesheet">
@@ -309,7 +311,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 
 .pattern{display:grid;grid-template-columns:48px 1fr 110px 90px;gap:18px;padding:18px 20px;border:1px solid var(--line);background:var(--panel);margin-bottom:8px;align-items:center}
 .p-rank{font-family:'Fraunces',serif;font-size:24px;color:var(--muted);font-weight:300}
-.p-quote{font-size:14px;color:var(--ink);line-height:1.6;margin-bottom:8px}
+.p-quote{font-family:'Fraunces',serif;font-size:14px;font-weight:400;color:var(--ink);line-height:1.4;margin-bottom:8px;letter-spacing:-.005em}
 .p-meta{display:flex;gap:10px;align-items:center}
 .p-tag{font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line-2);color:var(--ink-2)}
 .p-trigger{font-size:10px;color:var(--muted)}
@@ -1211,9 +1213,11 @@ buildInventory();
 </body>
 </html>`;
 
-fs.mkdirSync(DIR, { recursive: true });
-fs.writeFileSync(OUT, html);
-process.stdout.write('Dashboard → ' + OUT + '\\n');
+  return html;
+}
 
-const opener = process.platform==='darwin'?'open':process.platform==='win32'?'start':'xdg-open';
-try { execSync(opener + ' "' + OUT + '"'); } catch {}
+module.exports = { renderDashboard };
+
+if (require.main === module) {
+  process.stdout.write('dashboard.js is now a module — use server.js to serve\n');
+}
