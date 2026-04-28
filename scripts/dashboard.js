@@ -50,6 +50,14 @@ const allSkills = {...(archive.skill_totals||{})};
 sessions.forEach(s=>(s.skills||[]).forEach(sk=>{allSkills[sk]=(allSkills[sk]||0)+1;}));
 const topSkills = Object.entries(allSkills).sort((a,b)=>b[1]-a[1]).slice(0,6);
 
+const allCommands = {};
+sessions.forEach(s=>Object.entries(s.commands||{}).forEach(([c,n])=>{allCommands[c]=(allCommands[c]||0)+n;}));
+const topCommands = Object.entries(allCommands).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+const allAgents = {};
+sessions.forEach(s=>Object.entries(s.agents||{}).forEach(([a,n])=>{allAgents[a]=(allAgents[a]||0)+n;}));
+const topAgents = Object.entries(allAgents).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
 const dayMap = {};
 for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*86400000);dayMap[d.toISOString().slice(0,10)]=0;}
 sessions.forEach(s=>{if(s.at){const k=s.at.slice(0,10);if(k in dayMap)dayMap[k]++;}});
@@ -147,6 +155,8 @@ const DATA = {
   heatGrid,
   tools: topTools,
   skills: topSkills,
+  commands: topCommands,
+  agents: topAgents,
   bashCmds: topBashCmds,
   paved: pavedEnriched,
   patterns: detectedPaths,
@@ -181,7 +191,7 @@ const html = `<!DOCTYPE html>
   --good: oklch(0.72 0.10 145);
   --warn: oklch(0.65 0.16 30);
 }
-html,body{background:var(--bg);color:var(--ink);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;font-feature-settings:"ss01"}
+html,body{background:var(--bg);color:var(--ink);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;line-height:1.5;font-feature-settings:"ss01"}
 body{background-image:linear-gradient(180deg,transparent 0%,oklch(0.18 0.02 70/.3) 100%),repeating-linear-gradient(0deg,transparent 0 23px,oklch(0.20 0.01 70/.35) 23px 24px)}
 button{font-family:inherit;cursor:pointer;background:none;border:none;outline:none;color:inherit}
 .serif{font-family:'Fraunces',serif;font-feature-settings:"ss01"}
@@ -311,6 +321,8 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .p-freq{text-align:right;font-family:'Fraunces',serif}
 .p-freq-n{font-size:32px;font-weight:300;color:var(--signal);line-height:1}
 .p-freq-x{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono'}
+.pattern-acted{border-color:var(--good)!important;background:oklch(0.72 0.10 145 / .05)!important}
+.p-acted{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--good);border:1px solid var(--good);padding:2px 7px}
 
 .log{border:1px solid var(--line);background:var(--panel)}
 .log-row{display:grid;grid-template-columns:80px 14px 1fr 80px 80px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);align-items:center}
@@ -585,6 +597,8 @@ document.querySelectorAll(".tab").forEach(btn=>{
 function buildOverview(){
   const maxTool = D.tools[0]?.[1]||1;
   const maxSkill = D.skills[0]?.[1]||1;
+  const maxCmd = D.commands[0]?.[1]||1;
+  const maxAgent = D.agents[0]?.[1]||1;
 
   const barFill = (val,max)=>'<div class="bar-fill" style="width:'+Math.max(2,Math.round(val/max*100))+'%"></div>';
 
@@ -601,6 +615,20 @@ function buildOverview(){
       <div class="bar-track">\${barFill(v,maxSkill)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
+
+  const cmdBars = D.commands.length ? D.commands.map(([n,v])=>\`
+    <div class="bar-row">
+      <span class="bar-name" title="/\${n}">/\${n}</span>
+      <div class="bar-track">\${barFill(v,maxCmd)}</div>
+      <span class="bar-val">\${v}</span>
+    </div>\`).join("") : '<div class="empty">No slash commands yet.</div>';
+
+  const agentBars = D.agents.length ? D.agents.map(([n,v])=>\`
+    <div class="bar-row">
+      <span class="bar-name" title="\${n}">\${n}</span>
+      <div class="bar-track">\${barFill(v,maxAgent)}</div>
+      <span class="bar-val">\${v}</span>
+    </div>\`).join("") : '<div class="empty">No agent dispatches yet.</div>';
 
   const maxCell = Math.max(...D.heatGrid.flat(), 1);
   const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -638,6 +666,16 @@ function buildOverview(){
       <div class="panel">
         <div class="panel-head"><div class="panel-title">Skills · Top 6</div><div class="panel-meta">\${D.skills.reduce((a,b)=>a+b[1],0)} invocations</div></div>
         <div class="bars">\${skillBars}</div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Slash Commands · Top 6</div><div class="panel-meta">\${D.commands.reduce((a,b)=>a+b[1],0)} uses</div></div>
+        <div class="bars">\${cmdBars}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Agents · Top 6</div><div class="panel-meta">\${D.agents.reduce((a,b)=>a+b[1],0)} dispatches</div></div>
+        <div class="bars">\${agentBars}</div>
       </div>
     </div>
     <div class="panel" style="margin-bottom:16px">
@@ -1049,14 +1087,19 @@ function buildSignals(){
 
 function buildPatterns(){
   const maxFreq = Math.max(...D.patterns.map(p=>p.frequency||p.freq||1),1);
-  const pats = D.patterns.length ? D.patterns.map((p,i)=>\`
-    <div class="pattern">
+  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.description||s.desc||''));
+  const pats = D.patterns.length ? D.patterns.map((p,i)=>{
+    const desc = p.description||p.desc||'';
+    const acted = acceptedDescs.has(desc);
+    return \`
+    <div class="pattern\${acted?' pattern-acted':''}">
       <div class="p-rank">\${String(i+1).padStart(2,"0")}</div>
       <div>
-        <div class="p-quote">\${p.description||p.desc||''}</div>
+        <div class="p-quote">\${desc}</div>
         <div class="p-meta">
           <span class="t-type" style="color:\${typeCol(p.type)}">\${p.type||'pattern'}</span>
           <span class="p-trigger">trigger · <b>\${p.suggested_artifact?.trigger||p.tag||'—'}</b></span>
+          \${acted?'<span class="p-acted">paved</span>':''}
         </div>
       </div>
       <div class="p-strength">
@@ -1067,7 +1110,8 @@ function buildPatterns(){
         <div class="p-freq-n">\${p.frequency||p.freq||'?'}</div>
         <div class="p-freq-x">obs.</div>
       </div>
-    </div>\`).join("") : '<div class="empty">Patterns emerge after 5+ sessions.</div>';
+    </div>\`;
+  }).join("") : '<div class="empty">Patterns emerge after 5+ sessions.</div>';
 
   const sugs = D.suggestions.length ? D.suggestions.slice().reverse().map(s=>\`
     <div class="log-row">

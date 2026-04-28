@@ -138,13 +138,15 @@ try {
   } catch {}
 
   // Session state
-  let state = { session_id: null, started_at: null, tools: {}, pre_tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
+  let state = { session_id: null, started_at: null, tools: {}, pre_tools: {}, skills: [], commands: {}, agents: {}, prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   try { state = loadJSON(STATE, state); } catch {}
   if (state.session_id !== sid) {
-    state = { session_id: sid, started_at: now, tools: {}, pre_tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
+    state = { session_id: sid, started_at: now, tools: {}, pre_tools: {}, skills: [], commands: {}, agents: {}, prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   }
   if (!state.bash_cmds) state.bash_cmds = {};
   if (!state.pre_tools) state.pre_tools = {};
+  if (!state.commands) state.commands = {};
+  if (!state.agents) state.agents = {};
 
   // ── PreToolUse ──────────────────────────────────────────────────────────────
   if (event === 'PreToolUse') {
@@ -177,6 +179,11 @@ try {
       }
     }
 
+    if (tool === 'Agent') {
+      const agentType = hook.tool_input?.subagent_type || 'general-purpose';
+      state.agents[agentType] = (state.agents[agentType] || 0) + 1;
+    }
+
     if (tool === 'Bash') {
       const cmd = hook.tool_input?.command || '';
       const sig = cmd.trim().substring(0, 120);
@@ -202,6 +209,9 @@ try {
       // Skill tool doesn't fire PostToolUse hooks — infer from /command prompts instead
       if (txt.trim().startsWith('/')) {
         const skillName = txt.trim().split(/\s+/)[0].slice(1); // strip leading /
+        if (skillName) {
+          state.commands[skillName] = (state.commands[skillName] || 0) + 1;
+        }
         if (skillName && !state.skills.includes(skillName)) {
           state.skills.push(skillName);
           const pavedMatch = Object.keys(pavedMap).find(n =>
@@ -270,6 +280,7 @@ try {
     fs.appendFileSync(SESSIONS, JSON.stringify({
       sid, at: now, started: state.started_at,
       tools: state.tools, skills: state.skills,
+      commands: state.commands, agents: state.agents,
       prompts: state.prompts, turns: state.turns,
       paved_used: state.paved_used,
       top_bash: topBash,
