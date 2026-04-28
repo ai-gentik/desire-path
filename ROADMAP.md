@@ -175,9 +175,9 @@ Desire-path could detect and surface this:
 | 3 | Repeated bash → hook suggester | Medium | High | ✅ done |
 | 4 | Maturity stage badge | Low | Medium | ✅ done |
 | 5 | Fix assistant-driven false positives | Low | High | ✅ done |
-| 6 | Permission denial tracking | Low | Medium | — |
+| 6 | Permission denial tracking | Low | Medium | ✅ done |
 | 7 | Skill invocation outcome tracking | Medium | High | — |
-| 8 | Stale skill detector | Low | Medium | — |
+| 8 | Stale skill detector | Low | Medium | ✅ done |
 | 9 | Prompt quality analysis | High | High | — |
 | 10 | Session timing / cache-miss awareness | Medium | Medium | — |
 | 11 | File co-access patterns | Medium | Medium | — |

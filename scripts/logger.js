@@ -22,6 +22,7 @@ const STATE        = path.join(DIR, 'state.json');
 const PAVED        = path.join(DIR, 'paved.jsonl');
 const SUGGESTIONS  = path.join(DIR, 'suggestions.jsonl');
 const ANALYSIS_DUE = path.join(DIR, 'analysis-due.json');
+const DENIED       = path.join(DIR, 'denied-totals.json');
 
 const MAX_SESSIONS   = 100;  // keep in hot jsonl
 const MAX_USAGE_ROWS = 200;  // compact usage after this many raw entries
@@ -137,12 +138,19 @@ try {
   } catch {}
 
   // Session state
-  let state = { session_id: null, started_at: null, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
+  let state = { session_id: null, started_at: null, tools: {}, pre_tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   try { state = loadJSON(STATE, state); } catch {}
   if (state.session_id !== sid) {
-    state = { session_id: sid, started_at: now, tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
+    state = { session_id: sid, started_at: now, tools: {}, pre_tools: {}, skills: [], prompts: [], turns: 0, paved_used: [], bash_cmds: {} };
   }
   if (!state.bash_cmds) state.bash_cmds = {};
+  if (!state.pre_tools) state.pre_tools = {};
+
+  // ── PreToolUse ──────────────────────────────────────────────────────────────
+  if (event === 'PreToolUse') {
+    const tool = hook.tool_name;
+    if (tool) state.pre_tools[tool] = (state.pre_tools[tool] || 0) + 1;
+  }
 
   // ── PostToolUse ─────────────────────────────────────────────────────────────
   if (event === 'PostToolUse') {
@@ -198,9 +206,19 @@ try {
           if (lastSuggest) {
             const age = Date.now() - new Date(lastSuggest.at).getTime();
             if (age < 5 * 60 * 1000) {
-              fs.appendFileSync(SUGGESTIONS, JSON.stringify({
-                at: now, sid, pattern: lastSuggest.pattern, outcome: 'accepted'
-              }) + '\n');
+              const existing = fs.existsSync(SUGGESTIONS)
+                ? fs.readFileSync(SUGGESTIONS, 'utf8').trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
+                : [];
+              const alreadyLogged = existing.some(e =>
+                e.outcome === 'accepted' &&
+                e.pattern?.type === lastSuggest.pattern?.type &&
+                e.pattern?.description === lastSuggest.pattern?.description
+              );
+              if (!alreadyLogged) {
+                fs.appendFileSync(SUGGESTIONS, JSON.stringify({
+                  at: now, sid, pattern: lastSuggest.pattern, outcome: 'accepted'
+                }) + '\n');
+              }
             }
           }
         } catch {}
@@ -216,12 +234,28 @@ try {
       .filter(([,n]) => n >= 2)
       .sort((a,b) => b[1]-a[1])
       .slice(0, 5);
+
+    // Compute implied denials: tools requested (pre) but not completed (post)
+    const deniedTools = {};
+    Object.entries(state.pre_tools || {}).forEach(([t, pre]) => {
+      const post = state.tools[t] || 0;
+      if (pre > post) deniedTools[t] = pre - post;
+    });
+    if (Object.keys(deniedTools).length > 0) {
+      const existing = loadJSON(DENIED, {});
+      Object.entries(deniedTools).forEach(([t, n]) => {
+        existing[t] = (existing[t] || 0) + n;
+      });
+      fs.writeFileSync(DENIED, JSON.stringify(existing, null, 2));
+    }
+
     fs.appendFileSync(SESSIONS, JSON.stringify({
       sid, at: now, started: state.started_at,
       tools: state.tools, skills: state.skills,
       prompts: state.prompts, turns: state.turns,
       paved_used: state.paved_used,
-      top_bash: topBash
+      top_bash: topBash,
+      denied_tools: deniedTools
     }) + '\n');
 
     // Self-compact — runs in same process, no extra spawn

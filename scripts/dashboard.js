@@ -38,6 +38,7 @@ const lastSuggest = json(path.join(DIR,'last-suggestion.json'), null);
 const archive     = json(path.join(DIR,'sessions-archive.json'), {total_sessions:0,tool_totals:{},skill_totals:{}});
 const inventory   = json(path.join(DIR,'inventory.json'), {summary:{total:0,dead:0,stale:0,active:0},artifacts:[],dead:[],stale:[]});
 const removals    = lines(path.join(DIR,'removals.jsonl'));
+const deniedRaw   = json(path.join(DIR,'denied-totals.json'), {});
 
 // ── Compute ───────────────────────────────────────────────────────────────────
 const totalSessions = sessions.length + (archive.total_sessions||0);
@@ -67,6 +68,15 @@ sessions.forEach(s => {
   });
 });
 const topBashCmds = Object.entries(bashSessionCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+// Merge session-level denials into totals for display
+const deniedMerged = {...deniedRaw};
+sessions.forEach(s => {
+  Object.entries(s.denied_tools||{}).forEach(([t,n]) => {
+    deniedMerged[t] = (deniedMerged[t]||0) + n;
+  });
+});
+const topDenied = Object.entries(deniedMerged).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
 // Weekday × hour heatmap (7 days × 24 hours), 0=Mon … 6=Sun
 const heatGrid = Array.from({length:7},()=>Array(24).fill(0));
@@ -139,9 +149,11 @@ const DATA = {
   suggestions: allSuggestions,
   inventory: inventory.artifacts||[],
   removals,
+  deniedTools: topDenied,
   generatedAt: new Date().toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}),
   pendingCount: allSuggestions.filter(s=>s.outcome==='pending').length,
   deadCount: (inventory.artifacts||[]).filter(a=>a.status==='dead').length,
+  staleCount: (inventory.artifacts||[]).filter(a=>a.status==='stale').length,
   stage,
 };
 
@@ -347,6 +359,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
     <span>last sweep <b>${DATA.generatedAt.split(',').pop().trim()}</b></span>
     <span>pending <b style="color:var(--signal)">${DATA.pendingCount}</b></span>
     <span>dead <b style="color:var(--warn)">${DATA.deadCount}</b></span>
+    <span>stale <b style="color:var(--muted)">${DATA.staleCount}</b></span>
   </div>
   <div class="strip-right" style="display:flex;gap:12px;align-items:center"><span class="stage-badge">${DATA.stage}</span><span>v4 · observatory · <b>${DATA.generatedAt}</b></span></div>
 </div>
@@ -387,11 +400,13 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 
 <nav class="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="signals">Signals</button>
   <button class="tab" data-tab="patterns">Patterns <span class="count" id="t-pat"></span></button>
   <button class="tab" data-tab="inventory">Inventory <span class="count" id="t-inv"></span></button>
 </nav>
 
 <div id="tab-overview"></div>
+<div id="tab-signals" style="display:none"></div>
 <div id="tab-patterns" style="display:none"></div>
 <div id="tab-inventory" style="display:none"></div>
 
@@ -449,7 +464,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.addEventListener("click",()=>{
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["overview","patterns","inventory"].forEach(id=>{
+    ["overview","signals","patterns","inventory"].forEach(id=>{
       document.getElementById("tab-"+id).style.display = id===btn.dataset.tab?"block":"none";
     });
   });
@@ -458,8 +473,6 @@ document.querySelectorAll(".tab").forEach(btn=>{
 function buildOverview(){
   const maxTool = D.tools[0]?.[1]||1;
   const maxSkill = D.skills[0]?.[1]||1;
-  const maxDay = Math.max(...D.activity,1);
-  const maxHour = Math.max(...D.hours,1);
 
   const cellsForVal = (val,max)=>{
     const segs = 24;
@@ -481,32 +494,13 @@ function buildOverview(){
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
 
-  const heat = D.hours.map((v,i)=>{
-    const peak = v>=maxHour*0.8 && v>0;
-    const off = i<6||i>=22;
-    const bg = peak?'var(--signal)':off?'oklch(0.45 0.03 240)':'var(--signal-dim)';
-    const op = (v===0?(off?.06:.15):(off?Math.min(.35,.2+v/maxHour*.3):.4+v/maxHour*.6)).toFixed(2);
-    const hr = String(i).padStart(2,'0');
-    return \`<div class="h" title="\${v} session\${v!==1?'s':''} at \${hr}:00" style="height:\${Math.max(2,Math.round(v/maxHour*112))}px;background:\${bg};opacity:\${op}"></div>\`;
-  }).join("");
-
-  const dayLabels = D.activityDates.map((d,i)=>{
-    const dt = new Date(d);
-    return (i%2===0)?dt.getDate():"";
-  });
-  const bigSpark = D.activity.map((v,i)=>{
-    const isPeak = v===maxDay && v>0;
-    return \`<div class="col \${isPeak?'peak':''}" title="\${D.activityDates[i]}: \${v} session\${v!==1?'s':''}" style="height:\${Math.max(2,Math.round(v/maxDay*112))}px">\${dayLabels[i]?\`<span class="lbl">\${dayLabels[i]}</span>\`:""}</div>\`;
-  }).join("");
-
   const maxCell = Math.max(...D.heatGrid.flat(), 1);
   const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const wkRows = D.heatGrid.map((row, di)=>{
     const cells = row.map((v,hi)=>{
       const op = v===0 ? 0.06 : Math.max(0.18, v/maxCell);
-      const col = v>=maxCell*0.8 && v>0 ? 'var(--signal)' : 'var(--signal)';
       const hr = String(hi).padStart(2,'0');
-      return \`<div class="wk-cell" title="\${days[di]} \${hr}:00 — \${v} session\${v!==1?'s':''}" style="background:\${col};opacity:\${op.toFixed(2)}"></div>\`;
+      return \`<div class="wk-cell" title="\${days[di]} \${hr}:00 — \${v} session\${v!==1?'s':''}" style="background:var(--signal);opacity:\${op.toFixed(2)}"></div>\`;
     }).join('');
     return \`<div class="wk-row"><div class="wk-label">\${days[di]}</div>\${cells}</div>\`;
   }).join('');
@@ -527,18 +521,8 @@ function buildOverview(){
       <td class="r"><span class="t-status \${p.working?'working':'growing'}">\${p.working?'walked':'overgrown'}</span></td>
     </tr>\`).join("") : '<tr><td colspan="6"><div class="empty">Nothing paved yet — say yes to a suggestion.</div></td></tr>';
 
-  const isStopCmd = (c)=>/git (status|diff|log)|npm test|jest|pytest|make test|lint/.test(c);
-  const isStartCmd = (c)=>/npm (install|run dev|start)|yarn (dev|start)|docker|brew/.test(c);
-  const bashTag = (c)=>isStopCmd(c)?'Stop hook':isStartCmd(c)?'Start hook':'skill';
-  const bashRows = D.bashCmds.length ? D.bashCmds.map(([cmd,n])=>\`
-    <tr>
-      <td><code class="t-name" style="font-size:11px">\${cmd.length>72?cmd.substring(0,69)+'…':cmd}</code></td>
-      <td class="r"><span class="p-tag" style="font-size:9px">\${bashTag(cmd)}</span></td>
-      <td class="r"><span class="t-num">\${n}</span> <span style="color:var(--muted);font-size:10px">sess</span></td>
-    </tr>\`).join('') : '<tr><td colspan="3"><div class="empty">No repeated bash commands yet.</div></td></tr>';
-
   document.getElementById("tab-overview").innerHTML = \`
-    <div class="grid-2">
+    <div class="grid-2" style="margin-bottom:16px">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">Tools · Top 8</div><div class="panel-meta">\${D.tools.reduce((a,b)=>a+b[1],0)} calls</div></div>
         <div class="bars">\${toolBars}</div>
@@ -548,26 +532,8 @@ function buildOverview(){
         <div class="bars">\${skillBars}</div>
       </div>
     </div>
-    <div class="panel" style="padding:0;margin-bottom:16px">
-      <div class="panel-head" style="padding:14px 20px">
-        <div class="panel-title">Repeated Bash Commands · hook candidates</div>
-        <div class="panel-meta">\${D.bashCmds.length} distinct commands · by session frequency</div>
-      </div>
-      <table class="tbl"><thead><tr><th>Command</th><th class="r">Candidate</th><th class="r">Sessions</th></tr></thead><tbody>\${bashRows}</tbody></table>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <div class="panel-head"><div class="panel-title">Activity · 14d</div><div class="panel-meta">\${D.activity.reduce((a,b)=>a+b,0)} sessions · peak \${maxDay}</div></div>
-        <div class="spark-big">\${bigSpark}</div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><div class="panel-title">Hour-of-day distribution</div><div class="panel-meta">peak \${D.hours.indexOf(maxHour)}:00</div></div>
-        <div class="heat-wide">\${heat}</div>
-        <div class="heat-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
-      </div>
-    </div>
     <div class="panel" style="margin-bottom:16px">
-      <div class="panel-head"><div class="panel-title">Activity · Weekday × Hour</div><div class="panel-meta">hot sessions only · darker = more activity</div></div>
+      <div class="panel-head"><div class="panel-title">When you work · Weekday × Hour</div><div class="panel-meta">darker = more sessions</div></div>
       <div class="wk-heatmap">\${wkRows}</div>
       <div class="wk-axis"><div></div>\${wkAxisLabels}</div>
     </div>
@@ -580,6 +546,59 @@ function buildOverview(){
         <thead><tr><th>Name</th><th>Type</th><th class="r">Trend</th><th class="r">Uses</th><th class="r">Last</th><th class="r">Status</th></tr></thead>
         <tbody>\${pavedRows}</tbody>
       </table>
+    </div>
+  \`;
+}
+
+function buildSignals(){
+  const maxHour = Math.max(...D.hours,1);
+
+  const heat = D.hours.map((v,i)=>{
+    const peak = v>=maxHour*0.8 && v>0;
+    const off = i<6||i>=22;
+    const bg = peak?'var(--signal)':off?'oklch(0.45 0.03 240)':'var(--signal-dim)';
+    const op = (v===0?(off?.06:.15):(off?Math.min(.35,.2+v/maxHour*.3):.4+v/maxHour*.6)).toFixed(2);
+    const hr = String(i).padStart(2,'0');
+    return \`<div class="h" title="\${v} session\${v!==1?'s':''} at \${hr}:00" style="height:\${Math.max(2,Math.round(v/maxHour*112))}px;background:\${bg};opacity:\${op}"></div>\`;
+  }).join("");
+
+  const isStopCmd = (c)=>/git (status|diff|log)|npm test|jest|pytest|make test|lint/.test(c);
+  const isStartCmd = (c)=>/npm (install|run dev|start)|yarn (dev|start)|docker|brew/.test(c);
+  const bashTag = (c)=>isStopCmd(c)?'Stop hook':isStartCmd(c)?'Start hook':'skill';
+  const bashRows = D.bashCmds.length ? D.bashCmds.map(([cmd,n])=>\`
+    <tr>
+      <td><code class="t-name" style="font-size:11px">\${cmd.length>72?cmd.substring(0,69)+'…':cmd}</code></td>
+      <td class="r"><span class="p-tag" style="font-size:9px">\${bashTag(cmd)}</span></td>
+      <td class="r"><span class="t-num">\${n}</span> <span style="color:var(--muted);font-size:10px">sess</span></td>
+    </tr>\`).join('') : '<tr><td colspan="3"><div class="empty">No repeated bash commands yet.</div></td></tr>';
+
+  const deniedRows = D.deniedTools.length ? D.deniedTools.map(([tool,n])=>\`
+    <tr>
+      <td><span class="t-name">\${tool}</span></td>
+      <td class="r"><span class="t-num" style="color:var(--warn)">\${n}</span> <span style="color:var(--muted);font-size:10px">denied</span></td>
+    </tr>\`).join('') : '<tr><td colspan="2"><div class="empty">No denials recorded yet — data accumulates over sessions.</div></td></tr>';
+
+  document.getElementById("tab-signals").innerHTML = \`
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="panel" style="padding:0">
+        <div class="panel-head" style="padding:14px 20px">
+          <div class="panel-title">Repeated Bash Commands · hook candidates</div>
+          <div class="panel-meta">\${D.bashCmds.length} distinct commands · by session frequency</div>
+        </div>
+        <table class="tbl"><thead><tr><th>Command</th><th class="r">Candidate</th><th class="r">Sessions</th></tr></thead><tbody>\${bashRows}</tbody></table>
+      </div>
+      <div class="panel" style="padding:0">
+        <div class="panel-head" style="padding:14px 20px">
+          <div class="panel-title">Permission Denials · top blocked tools</div>
+          <div class="panel-meta">\${D.deniedTools.reduce((a,b)=>a+b[1],0)} total · inferred from pre/post mismatch</div>
+        </div>
+        <table class="tbl"><thead><tr><th>Tool</th><th class="r">Count</th></tr></thead><tbody>\${deniedRows}</tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Hour-of-day distribution</div><div class="panel-meta">peak \${D.hours.indexOf(maxHour)}:00</div></div>
+      <div class="heat-wide">\${heat}</div>
+      <div class="heat-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
     </div>
   \`;
 }
@@ -676,6 +695,12 @@ function buildInventory(){
       <div class="callout-cmd">/desire-path:cleanup</div>
     </div>\` : '';
 
+  const staleBanner = counts.stale>0 ? \`
+    <div class="callout" style="border-color:var(--signal);background:oklch(0.20 0.05 75/.3)">
+      <div class="callout-text"><b>\${counts.stale} skill\${counts.stale>1?'s':''}</b> not used in 30+ days. Still earning their keep?</div>
+      <div class="callout-cmd">/desire-path:cleanup</div>
+    </div>\` : '';
+
   const empty = !inv.length ? '<div class="empty" style="margin-top:16px">No artifacts indexed yet.</div>' : '';
 
   document.getElementById("tab-inventory").innerHTML = \`
@@ -687,11 +712,13 @@ function buildInventory(){
     </div>
     \${inv.length ? \`<div class="panel" style="padding:0"><table class="tbl inv-tbl"><thead><tr><th>Name</th><th>Type</th><th>Scope</th><th class="r">Uses</th><th class="r">Last · Age</th><th class="r">Action</th></tr></thead><tbody>\${rows}</tbody></table></div>\` : ''}
     \${empty}
+    \${staleBanner}
     \${banner}
   \`;
 }
 
 buildOverview();
+buildSignals();
 buildPatterns();
 buildInventory();
 </script>

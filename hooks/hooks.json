@@ -13,6 +13,19 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "DP_EVENT=PreToolUse node $CLAUDE_PLUGIN_ROOT/scripts/logger.js",
+            "async": true,
+            "timeout": 3
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": ".*",
