@@ -18,10 +18,13 @@ const path = require('path');
 const https = require('https');
 
 const DIR = path.join(os.homedir(), '.claude', 'desire-path');
-const SESSIONS     = path.join(DIR, 'sessions.jsonl');
-const ANALYSIS_DUE = path.join(DIR, 'analysis-due.json');
-const LAST_SUGGEST = path.join(DIR, 'last-suggestion.json');
-const SUGGESTIONS  = path.join(DIR, 'suggestions.jsonl');
+const SESSIONS        = path.join(DIR, 'sessions.jsonl');
+const ANALYSIS_DUE    = path.join(DIR, 'analysis-due.json');
+const LAST_SUGGEST    = path.join(DIR, 'last-suggestion.json');
+const SUGGESTIONS     = path.join(DIR, 'suggestions.jsonl');
+const LATEST_ANALYSIS = path.join(DIR, 'latest-analysis.json');
+
+const DEEP_ANALYSIS_INTERVAL = 25; // sessions between deep analysis suggestions
 
 function acceptedTypes() {
   try {
@@ -242,6 +245,56 @@ function buildReason(pattern) {
   return `[desire-path] ${pattern.description} (${pattern.frequency}× observed). ${instruction}`;
 }
 
+// ── Tier 1: write local detection to latest-analysis.json ────────────────────
+
+function writeAnalysis(pattern, totalSessions) {
+  try {
+    const existing = (() => { try { return JSON.parse(fs.readFileSync(LATEST_ANALYSIS, 'utf8')); } catch { return null; } })();
+    // Only overwrite if new pattern has higher frequency or existing is stale (>25 sessions old)
+    const existingAge = totalSessions - (existing?._session_count_at_analysis || 0);
+    if (existing && existingAge < 5 && (existing.top_paths?.[0]?.frequency || 0) >= pattern.frequency) return;
+
+    const entry = {
+      rank: 1,
+      type: pattern.type,
+      description: pattern.description,
+      evidence: [],
+      frequency: pattern.frequency,
+      suggested_artifact: {
+        type: pattern.type === 'claude_md' ? 'claude_md' : pattern.artifact || pattern.type,
+        name: '',
+        trigger: pattern.action || ''
+      }
+    };
+    const existing_paths = existing?.top_paths?.filter(p => p.type !== pattern.type) || [];
+    const analysis = {
+      _session_count_at_analysis: totalSessions,
+      _generated_by: 'checker-local',
+      top_paths: [entry, ...existing_paths].slice(0, 5).map((p, i) => ({ ...p, rank: i + 1 })),
+      quick_win: { description: pattern.description, action: pattern.action || '' },
+      stats: { total_sessions: totalSessions }
+    };
+    fs.writeFileSync(LATEST_ANALYSIS, JSON.stringify(analysis, null, 2));
+  } catch {}
+}
+
+// ── Tier 2: detect when deep analysis is due ──────────────────────────────────
+
+function deepAnalysisDue(totalSessions) {
+  try {
+    const existing = JSON.parse(fs.readFileSync(LATEST_ANALYSIS, 'utf8'));
+    if (existing._generated_by === 'checker-local') {
+      // Only suggest deep analysis if local analysis is DEEP_ANALYSIS_INTERVAL sessions old
+      return (totalSessions - (existing._session_count_at_analysis || 0)) >= DEEP_ANALYSIS_INTERVAL;
+    }
+    // Agent-generated analysis: use same interval
+    return (totalSessions - (existing._session_count_at_analysis || 0)) >= DEEP_ANALYSIS_INTERVAL;
+  } catch {
+    // No latest-analysis.json yet — suggest after first DEEP_ANALYSIS_INTERVAL sessions
+    return totalSessions >= DEEP_ANALYSIS_INTERVAL;
+  }
+}
+
 // ── Inventory check — run inline, sync ───────────────────────────────────────
 
 function runInventory() {
@@ -277,22 +330,14 @@ function buildCleanupReason(inv) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  if (cooldown()) { process.exit(0); return; }
-
   const sessions = readSessions(25);
+  const totalSessions = (() => { try { return JSON.parse(fs.readFileSync(ANALYSIS_DUE, 'utf8')).total_sessions || sessions.length; } catch { return sessions.length; } })();
 
-  // Always run inventory scan (fast, local only)
-  const inv = runInventory();
-  const hasDeadArtifacts = (inv.dead || 0) + (inv.stale || 0) > 0;
-
-  if (sessions.length < 3 && !hasDeadArtifacts) { process.exit(0); return; }
-
-  // Pattern detection (needs enough sessions)
+  // Pattern detection runs regardless of cooldown — Tier 1 write must always happen
   const done = acceptedTypes();
   let pattern = null;
   if (sessions.length >= 3) {
     pattern = detect(sessions);
-    // Skip patterns whose type was already accepted — don't nag about the same category
     if (pattern && done.has(pattern.type)) pattern = null;
     if (sessions.length >= 8) {
       pattern = await claudeRefine(sessions, pattern) || pattern;
@@ -302,7 +347,47 @@ async function main() {
 
   const hasPattern = pattern && pattern.confidence !== 'low';
 
-  // Decide what to surface — pattern wins over cleanup
+  // Tier 1: always persist to latest-analysis.json so dashboard is never empty
+  if (hasPattern) {
+    writeAnalysis(pattern, totalSessions);
+  } else if (!fs.existsSync(LATEST_ANALYSIS)) {
+    // Bootstrap: no pattern detected yet, but write stats so dashboard isn't empty
+    const toolFreq = {};
+    sessions.forEach(s => Object.entries(s.tools||{}).forEach(([t,n]) => { toolFreq[t]=(toolFreq[t]||0)+n; }));
+    const topTool = Object.entries(toolFreq).sort((a,b)=>b[1]-a[1])[0];
+    fs.writeFileSync(LATEST_ANALYSIS, JSON.stringify({
+      _session_count_at_analysis: totalSessions,
+      _generated_by: 'checker-local',
+      top_paths: [],
+      quick_win: { description: 'No strong patterns detected yet — keep using Claude Code', action: 'run /desire-path:pattern-detector for a full analysis' },
+      stats: { total_sessions: totalSessions, most_used_tool: topTool?.[0] || 'Bash', most_loaded_skill: null }
+    }, null, 2));
+  }
+
+  // Cooldown gates surfacing (block output) but not the write above
+  if (cooldown()) { process.exit(0); return; }
+
+  // Always run inventory scan (fast, local only)
+  const inv = runInventory();
+  const hasDeadArtifacts = (inv.dead || 0) + (inv.stale || 0) > 0;
+
+  if (sessions.length < 3 && !hasDeadArtifacts) { process.exit(0); return; }
+
+  // Tier 2: suggest deep analysis when interval is reached (takes priority over other suggestions)
+  if (deepAnalysisDue(totalSessions)) {
+    const deepReason = `[desire-path] ${totalSessions} sessions logged since last deep analysis. `
+      + `Proactively tell the user: "Your pattern data is ready for a deeper review — I can run a full analysis of your Claude Code habits and update the dashboard. Want me to do that?" `
+      + `Then offer to invoke the desire-path:pattern-detector agent.`;
+    fs.writeFileSync(LAST_SUGGEST, JSON.stringify({
+      at: new Date().toISOString(),
+      pattern: { type: 'deep_analysis', description: deepReason, frequency: totalSessions }
+    }));
+    try { fs.unlinkSync(ANALYSIS_DUE); } catch {}
+    process.stdout.write(JSON.stringify({ decision: 'block', reason: deepReason }));
+    process.exit(0);
+  }
+
+  // Surface pattern suggestion
   if (hasPattern) {
     fs.writeFileSync(LAST_SUGGEST, JSON.stringify({ at: new Date().toISOString(), pattern }));
     try { fs.unlinkSync(ANALYSIS_DUE); } catch {}
