@@ -21,6 +21,19 @@ const DIR = path.join(os.homedir(), '.claude', 'desire-path');
 const SESSIONS     = path.join(DIR, 'sessions.jsonl');
 const ANALYSIS_DUE = path.join(DIR, 'analysis-due.json');
 const LAST_SUGGEST = path.join(DIR, 'last-suggestion.json');
+const SUGGESTIONS  = path.join(DIR, 'suggestions.jsonl');
+
+function acceptedTypes() {
+  try {
+    return new Set(
+      fs.readFileSync(SUGGESTIONS, 'utf8').split('\n').filter(Boolean)
+        .map(l => { try { return JSON.parse(l); } catch { return null; } })
+        .filter(e => e?.outcome === 'accepted')
+        .map(e => e.pattern?.type)
+        .filter(Boolean)
+    );
+  } catch { return new Set(); }
+}
 
 function readSessions(n = 25) {
   try {
@@ -275,11 +288,15 @@ async function main() {
   if (sessions.length < 3 && !hasDeadArtifacts) { process.exit(0); return; }
 
   // Pattern detection (needs enough sessions)
+  const done = acceptedTypes();
   let pattern = null;
   if (sessions.length >= 3) {
     pattern = detect(sessions);
+    // Skip patterns whose type was already accepted — don't nag about the same category
+    if (pattern && done.has(pattern.type)) pattern = null;
     if (sessions.length >= 8) {
       pattern = await claudeRefine(sessions, pattern) || pattern;
+      if (pattern && done.has(pattern.type)) pattern = null;
     }
   }
 

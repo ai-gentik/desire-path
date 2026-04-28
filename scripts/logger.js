@@ -199,6 +199,24 @@ try {
       state.prompts.push({ t: now, p: txt.substring(0, 250) });
       if (state.prompts.length > 20) state.prompts = state.prompts.slice(-20);
 
+      // Skill tool doesn't fire PostToolUse hooks — infer from /command prompts instead
+      if (txt.trim().startsWith('/')) {
+        const skillName = txt.trim().split(/\s+/)[0].slice(1); // strip leading /
+        if (skillName && !state.skills.includes(skillName)) {
+          state.skills.push(skillName);
+          const pavedMatch = Object.keys(pavedMap).find(n =>
+            skillName.includes(n) || n.includes(skillName.split(':').pop())
+          );
+          if (pavedMatch) {
+            fs.appendFileSync(USAGE, JSON.stringify({
+              at: now, sid, artifact_name: pavedMatch,
+              artifact_type: 'skill', invocation: skillName, source: 'prompt'
+            }) + '\n');
+            if (!state.paved_used.includes(pavedMatch)) state.paved_used.push(pavedMatch);
+          }
+        }
+      }
+
       const acceptance = /^(yes|ja|do it|create|make it|add it|sure|go ahead|ok|yep|doe het|maak het)/i;
       if (acceptance.test(txt.trim())) {
         try {
