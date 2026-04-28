@@ -120,18 +120,13 @@ const workingPaths = pavedEnriched.filter(p=>p.working).length;
 const allSuggestions = [...suggestions];
 if(lastSuggest?.pattern){
   const desc = lastSuggest.pattern.description;
+  const type = lastSuggest.pattern.type;
+  // Don't add as pending if already logged by description OR if this type was already accepted
   const alreadyLogged = suggestions.find(s=>s.pattern?.description===desc);
-  if(!alreadyLogged) allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
+  const typeAccepted = suggestions.some(s=>s.outcome==='accepted' && s.pattern?.type===type);
+  if(!alreadyLogged && !typeAccepted) allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
 }
-// Deduplicate by type — keep latest entry per type so the log doesn't show
-// the same category repeated (e.g. two separate "hook" suggestions)
-const seenTypes = new Set();
-const dedupedSuggestions = allSuggestions.slice().reverse().filter(s=>{
-  const t = s.pattern?.type;
-  if(!t || seenTypes.has(t)) return false;
-  seenTypes.add(t);
-  return true;
-}).reverse();
+const dedupedSuggestions = allSuggestions;
 
 // ── Inject data into HTML ─────────────────────────────────────────────────────
 const DATA = {
