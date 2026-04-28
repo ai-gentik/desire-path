@@ -59,6 +59,15 @@ const allAgents = {};
 sessions.forEach(s=>Object.entries(s.agents||{}).forEach(([a,n])=>{allAgents[a]=(allAgents[a]||0)+n;}));
 const topAgents = Object.entries(allAgents).sort((a,b)=>b[1]-a[1]).slice(0,6);
 
+// Aggregate call edges: {from→to: {count, edge}}
+const callEdges = {};
+sessions.forEach(s=>(s.calls||[]).forEach(c=>{
+  const key = `${c.from}→${c.to}`;
+  if(!callEdges[key]) callEdges[key] = {from:c.from, to:c.to, edge:c.edge||'skill_agent', count:0};
+  callEdges[key].count++;
+}));
+const topCallEdges = Object.values(callEdges).sort((a,b)=>b.count-a.count);
+
 const dayMap = {};
 for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*86400000);dayMap[d.toISOString().slice(0,10)]=0;}
 sessions.forEach(s=>{if(s.at){const k=s.at.slice(0,10);if(k in dayMap)dayMap[k]++;}});
@@ -158,6 +167,7 @@ const DATA = {
   skills: topSkills,
   commands: topCommands,
   agents: topAgents,
+  callEdges: topCallEdges,
   bashCmds: topBashCmds,
   paved: pavedEnriched,
   patterns: detectedPaths,
@@ -811,8 +821,7 @@ function buildMap(){
     const ey = cy + Math.sin(angle)*r*0.78;
     const path = trail(cx, cy, ex, ey, 1.4);
     const label = p.description || p.desc || p.suggested_artifact?.trigger || 'unnamed';
-    const typeLabel = p.type || p.suggested_artifact?.name || '';
-    const labelShort = typeLabel || (label.length>22 ? label.slice(0,20)+'…' : label);
+    const labelShort = p.suggested_artifact?.name || p.type || (label.length>22 ? label.slice(0,20)+'…' : label);
     const tipPayload = encodeURIComponent(JSON.stringify({
       kind:'desire', name:label, type:p.type||'pattern', frequency:p.frequency||p.freq||'?',
       trigger:p.suggested_artifact?.trigger||''
@@ -852,6 +861,27 @@ function buildMap(){
       trails += \`<path class="map-trail-glow" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
     }
     trails += \`<path class="map-trail" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
+  });
+
+  // ── Cross-artifact call arcs (skill→agent, skill→skill) ──
+  let callArcs = '';
+  (D.callEdges||[]).forEach(edge=>{
+    const fromPos = positions.find(p=>p.a.name===edge.from);
+    const toPos   = positions.find(p=>p.a.name===edge.to);
+    if(!fromPos||!toPos) return;
+    const x1=fromPos.x, y1=fromPos.y, x2=toPos.x, y2=toPos.y;
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    // Curve control point bent toward center
+    const cx2=mx+(cx-mx)*0.35, cy2=my+(cy-my)*0.35;
+    const arcColor = edge.edge==='skill_skill' ? 'oklch(0.70 0.14 75)' : 'oklch(0.65 0.10 300)';
+    const arcWidth = Math.min(3, 1 + edge.count * 0.5);
+    callArcs += \`<path d="M\${x1} \${y1} Q\${cx2} \${cy2} \${x2} \${y2}" fill="none" stroke="\${arcColor}" stroke-width="\${arcWidth}" stroke-dasharray="4 3" opacity="0.7" stroke-linecap="round">
+      <title>\${edge.from} → \${edge.to} (\${edge.count}×)</title>
+    </path>\`;
+    // Arrow head at destination
+    const dx=x2-cx2, dy=y2-cy2, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const nx=dx/len*6, ny=dy/len*6;
+    callArcs += \`<polygon points="\${x2},\${y2} \${x2-nx-ny*0.5},\${y2-ny+nx*0.5} \${x2-nx+ny*0.5},\${y2-ny-nx*0.5}" fill="\${arcColor}" opacity="0.7" />\`;
   });
 
   // ── Pins for artifacts ──
@@ -933,6 +963,7 @@ function buildMap(){
           <g>\${grass}</g>
           <g class="map-desire-layer">\${desire}</g>
           <g class="map-trail-layer">\${trails}</g>
+          <g class="map-call-arc-layer">\${callArcs}</g>
           <g class="map-origin-layer">\${origin}</g>
           <g class="map-pin-layer">\${pins}</g>
         </svg>

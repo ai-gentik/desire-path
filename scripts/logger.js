@@ -147,11 +147,29 @@ try {
   if (!state.pre_tools) state.pre_tools = {};
   if (!state.commands) state.commands = {};
   if (!state.agents) state.agents = {};
+  if (!state.calls) state.calls = [];
 
   // ── PreToolUse ──────────────────────────────────────────────────────────────
   if (event === 'PreToolUse') {
     const tool = hook.tool_name;
     if (tool) state.pre_tools[tool] = (state.pre_tools[tool] || 0) + 1;
+
+    if (tool === 'Skill') {
+      const skillName = hook.tool_input?.skill || hook.tool_input?.skill_name || hook.tool_input?.name || '';
+      if (skillName) {
+        if (state.active_skill && state.active_skill !== skillName) {
+          state.calls.push({ from: state.active_skill, to: skillName, edge: 'skill_skill' });
+        }
+        state.active_skill = skillName;
+      }
+    }
+
+    if (tool === 'Agent') {
+      const agentType = hook.tool_input?.subagent_type || 'general-purpose';
+      if (state.active_skill) {
+        state.calls.push({ from: state.active_skill, to: agentType, edge: 'skill_agent' });
+      }
+    }
   }
 
   // ── PostToolUse ─────────────────────────────────────────────────────────────
@@ -177,6 +195,7 @@ try {
           if (!state.paved_used.includes(pavedMatch)) state.paved_used.push(pavedMatch);
         }
       }
+      state.active_skill = null;
     }
 
     if (tool === 'Agent') {
@@ -284,7 +303,8 @@ try {
       prompts: state.prompts, turns: state.turns,
       paved_used: state.paved_used,
       top_bash: topBash,
-      denied_tools: deniedTools
+      denied_tools: deniedTools,
+      calls: state.calls
     }) + '\n');
 
     // Self-compact — runs in same process, no extra spawn
