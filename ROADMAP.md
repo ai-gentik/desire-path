@@ -1,13 +1,12 @@
 # Desire Path — Roadmap
 
-## Known issues / false positives
+## Core concept
 
-### Assistant-driven tool sequence detection (FIXED in checker v2)
-The hook-pattern detector uses `Object.keys(session.tools)` to infer sequences, but `tools` is a frequency map — key order is insertion order, not temporal sequence. This caused pairs like `Read→Edit` to be flagged as automatable hooks even though they are procedurally required by the assistant (must read before editing).
+A desire path is a behavior users repeat manually that could be automated or improved.
+Desire-path has two tracks:
 
-**Fix applied:** blocklist of known assistant-workflow pairs (`Read→Edit`, `Read→Write`, `Bash→Bash`, `Read→Bash`, `Bash→Read`) is filtered before pattern scoring.
-
-**Deeper fix (future):** record actual ordered tool call sequences in sessions.jsonl (an array, not a map) so sequence detection is based on real temporal order rather than key insertion order. This would also enable detecting *user*-initiated sequences vs assistant-initiated ones.
+- **Pave the path** — detect repeated manual behaviors → suggest automation (hooks, skills, shortcuts)
+- **Reroute the path** — detect repeated bad habits → suggest a better way to work
 
 ---
 
@@ -15,171 +14,66 @@ The hook-pattern detector uses `Object.keys(session.tools)` to infer sequences, 
 - Sessions: turns, tools used per session, skills invoked
 - Usage totals: tool/skill frequency with compaction
 - Paved paths and suggestion outcomes
-- Bash commands (recent addition)
+- Bash commands (repeated command detection)
+- Permission denials
+- Activity heatmap (hour × weekday)
+- Stale skill detection
 
 ---
 
-## 1. Hidden behaviors worth capturing
+## Track 1 — Pave the path
 
-These are things users do repeatedly in Claude Code that leave no trace today:
-
-### Permission denials
-- Log when user **denies** a tool call (PreToolUse hook returning block)
-- Pattern: same tool denied repeatedly → surface as "you keep blocking X, want to restrict it globally?"
-- Reveals friction points in the permission model
+Detect what users do repeatedly and help them stop doing it manually.
 
 ### File co-access patterns
 - Track which files get Read/Edited together in the same session
 - Hot clusters → suggest workspace macros or workflow skills
 - E.g. always reading `CLAUDE.md` before editing `settings.json`
 
-### Repeated bash command fingerprints
-- Already partially tracked — extend to detect near-duplicate commands across sessions
-- `git status`, `npm run dev`, `cat some-file` — these are desire paths waiting to be hooks
-- Surface top-5 repeated commands as hook candidates
+### Cross-session file hotspots
+- Files touched in 3+ sessions → they're load-bearing, worth a Read shortcut or skill context
+- Show as "frequently visited files" in dashboard with a "create shortcut" CTA
 
 ### Tool retry / error patterns
 - When a tool call fails and the same tool is retried immediately, log it
-- Patterns: Edit failing → Read then Edit (user forgot to read first), Bash timing out
-- Reveals where the workflow breaks down
-
-### Skill invocation → outcome
-- Did the skill actually get followed? Or did the user override it?
-- Track: skill loaded but user said "skip this" or task diverged
-- Identifies skills that need simplification
-
-### Session time-of-day + duration
-- Already have timestamps — extract hour-of-day and day-of-week
-- Duration: `stop.at - start.at`
-- Powers the heatmap (see below)
+- E.g. Edit failing → Read then Edit (forgot to read first) → suggest a pre-Edit Read hook
+- Reveals where the workflow breaks down repeatedly
 
 ### MCP tool usage breakdown
-- MCP calls are tool calls — break out `mcp__*` separately from core tools
-- Which MCP servers get used? Which are installed but never touched (dead weight)?
+- Break out `mcp__*` tool calls separately from core tools
+- Surface MCP servers that are installed but never used → "dead weight" CTA to remove them
+
+### Permission denial → restriction suggestion
+- Already capturing denials — close the loop with an actionable suggestion
+- Pattern: same tool denied 3+ times → "You keep blocking X, want to restrict it globally?"
 
 ---
 
-## 2. Dashboard enhancements
+## Track 2 — Reroute the path
 
-All enhancements must strictly use the existing color scheme.
+Detect repeated bad habits and surface a better path.
 
-### Activity heatmap (hour × weekday)
-- Classic GitHub-style grid: 7 rows (Mon–Sun) × 24 cols (hours)
-- Cell color intensity = number of turns in that slot
-- Reveals: when the user actually works, peak focus hours
-- Data source: session timestamps (already captured)
-
-### Skill usage trend (sparklines)
-- Per-skill, show usage over last 30 days as a mini sparkline
-- Identifies: skills that spiked then dropped (one-time use), growing skills (habits forming)
-
-### Tool co-occurrence matrix
-- Small heatmap: which tools get called in the same session?
-- Read + Edit always together ✓ — Bash + WebSearch together → interesting signal
-
-### Permission denial panel
-- Simple list: "You've denied X tool N times this month"
-- CTA: "Add to blocklist?" or "Pave a restriction rule"
-
-### Paved path effectiveness
-- For each paved skill/hook: was it invoked after paving?
-- Dead paves (created but never triggered) are clutter — surface them for cleanup
-
-### Session duration histogram
-- Buckets: <5min, 5–15min, 15–30min, 30–60min, 60min+
-- Reveals: are sessions getting longer (more complex work) or shorter (more efficient)?
-
----
-
-## 3. Smarter desire path detection
-
-Moving from "count what happened" to "understand why":
-
-### Bash → Hook suggester
-- After N sessions, scan top repeated bash commands
-- Auto-generate hook YAML candidates: `"run npm test after Stop"`, `"show git status before Start"`
-- Present in dashboard under "Suggested hooks"
-
-### Conversation topic clustering
-- Light NLP: extract noun phrases from session summaries (if available) or tool args
-- Cluster into themes: "infrastructure", "frontend", "debugging", etc.
-- Reveals: what the user actually spends time on vs. what skills exist for
-
-### Stale skill detector
-- Skills installed but not invoked in 30+ days
-- Surface in dashboard with `/desire-path:cleanup` CTA
-
-### Cross-session file hotspots
-- Files touched in 3+ sessions → they're load-bearing, worth a Read shortcut or skill context
-- Show as "frequently visited files" in dashboard
-
----
-
-## 4. Capture infrastructure improvements
-
-### Richer session metadata
-- Add `model` field (which Claude model was active)
-- Add `project` field (cwd hash or project name) for per-project breakdowns
-- Add `denied_tools` array
-
-### Structured suggestion feedback
-- When a suggestion is dismissed, capture WHY (if askable): "not relevant", "already done", "too complex"
-- Improves future suggestion quality
-
----
-
----
-
-## 5. Prompt quality analysis
-
-> "I notice you do X — but Y would get better results."
-
-Detect anti-patterns in the user's prompts and surface improvement suggestions:
-
-- **Vague openers**: "do X", "fix Y" without context — suggest adding file paths or reproducing steps
-- **Repeated clarification loops**: user sends a prompt, then immediately sends a correction → the original prompt was underspecified
-- **Long monologue prompts**: >500 words that could be broken into steps
-- **Over-delegation**: asking Claude to "figure out" architecture rather than specifying constraints
-
-This is different from desire paths — it's not about workflow automation, it's about prompting skill. Output: periodic suggestions like "Your last 3 sessions had 2+ correction turns each — shorter, more specific prompts tend to land better on the first try."
-
-**Data needed:** prompt text (already stored, truncated at 250 chars), correction-turn detection (prompt follows a tool result quickly), turn count per session.
-
-**Privacy note:** prompts may contain sensitive content — suggestions should be based on structural patterns (length, correction rate), not prompt content itself.
-
----
-
-## 6. Session timing / prompt caching awareness
-
-Prompt cache TTL in Claude is **5 minutes**. After a 5-minute pause mid-session, the cache expires and the next turn re-reads the full context — slower and more expensive.
-
-Desire-path could detect and surface this:
-
-- **Session gap detection**: log timestamps between turns (not just session start/stop). If gap > 5 min mid-session, flag it.
-- **Cache-miss pattern**: user frequently pauses mid-session → suggest breaking work into shorter focused sessions rather than one long interrupted one
-- **Dashboard stat**: "estimated cache hits" — turns within 5 min of previous turn vs. cache-miss turns
-- **Proactive nudge**: if a session has been idle 4+ minutes, surface a reminder: "cache expires in ~1 min — wrap up this context or keep typing"
-
-**Why this matters:** a user who pauses for coffee mid-session unknowingly pays the cache-miss cost every time. Surfacing this turns an invisible cost into an actionable habit change.
-
-**Data needed:** turn-level timestamps (not currently captured — today we only have session start/stop). Would require logger changes to record each UserPromptSubmit timestamp.
+### Bad prompting patterns
+- **Vague openers without context**: "do X", "fix Y" without file paths or steps → suggest including context
+- **Correction loops**: user sends a prompt then immediately sends a correction → the original was underspecified
+- **Over-delegation**: asking Claude to "figure out" architecture → suggest specifying constraints first
+- Output: "Your last 5 sessions had 2+ correction turns each — adding file paths to your first message tends to land better on the first try"
+- Detection based on structural patterns only (turn count, correction rate) — not prompt content
 
 ---
 
 ## Priority order
 
-| # | Item | Effort | Value | Status |
-|---|------|--------|-------|--------|
-| 1 | Activity heatmap | Low | High | ✅ done |
-| 2 | Weekday × hour heatmap | Low | High | ✅ done |
-| 3 | Repeated bash → hook suggester | Medium | High | ✅ done |
-| 4 | Maturity stage badge | Low | Medium | ✅ done |
-| 5 | Fix assistant-driven false positives | Low | High | ✅ done |
-| 6 | Permission denial tracking | Low | Medium | ✅ done |
-| 7 | Skill invocation outcome tracking | Medium | High | — |
-| 8 | Stale skill detector | Low | Medium | ✅ done |
-| 9 | Prompt quality analysis | High | High | — |
-| 10 | Session timing / cache-miss awareness | Medium | Medium | — |
-| 11 | File co-access patterns | Medium | Medium | — |
-| 12 | Tool co-occurrence matrix | Medium | Low | — |
-| 13 | Conversation topic clustering | High | Medium | — |
+| # | Item | Track | Effort | Value | Status |
+|---|------|-------|--------|-------|--------|
+| 1 | Activity heatmap | infra | Low | High | ✅ done |
+| 2 | Repeated bash → hook suggester | pave | Medium | High | ✅ done |
+| 3 | Fix assistant-driven false positives | infra | Low | High | ✅ done |
+| 4 | Permission denial tracking | pave | Low | Medium | ✅ done |
+| 5 | Stale skill detector | pave | Low | Medium | ✅ done |
+| 6 | File co-access patterns | pave | Medium | High | — |
+| 7 | Cross-session file hotspots | pave | Low | Medium | — |
+| 8 | Tool retry / error patterns | pave | Medium | Medium | — |
+| 9 | MCP tool usage + dead weight | pave | Low | Medium | — |
+| 10 | Permission denial → suggestion CTA | pave | Low | Medium | — |
+| 11 | Bad prompting patterns | reroute | Medium | High | — |
