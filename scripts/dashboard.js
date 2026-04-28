@@ -245,10 +245,8 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .bars{display:flex;flex-direction:column;gap:6px}
 .bar-row{display:grid;grid-template-columns:130px 1fr 36px;gap:10px;align-items:center}
 .bar-name{font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;cursor:default}
-.bar-track{height:14px;position:relative;border-bottom:1px solid var(--line)}
-.bar-track-inner{position:absolute;inset:auto 0 0 0;height:6px;display:flex;gap:1px;align-items:flex-end}
-.bar-cell{flex:1;background:var(--ink-2);opacity:.3}
-.bar-cell.on{background:var(--signal);opacity:1}
+.bar-track{height:8px;position:relative;background:var(--panel-2);border-radius:1px;overflow:hidden}
+.bar-fill{height:100%;background:var(--signal);border-radius:1px;transition:width .3s ease}
 .bar-val{font-size:11px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
 
 .spark-big{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:8px}
@@ -474,23 +472,19 @@ function buildOverview(){
   const maxTool = D.tools[0]?.[1]||1;
   const maxSkill = D.skills[0]?.[1]||1;
 
-  const cellsForVal = (val,max)=>{
-    const segs = 24;
-    const filled = Math.round(val/max*segs);
-    return Array.from({length:segs},(_,i)=>\`<div class="bar-cell \${i<filled?'on':''}"></div>\`).join("");
-  };
+  const barFill = (val,max)=>'<div class="bar-fill" style="width:'+Math.max(2,Math.round(val/max*100))+'%"></div>';
 
   const toolBars = D.tools.length ? D.tools.map(([n,v])=>\`
     <div class="bar-row">
       <span class="bar-name" title="\${n}">\${n}</span>
-      <div class="bar-track"><div class="bar-track-inner">\${cellsForVal(v,maxTool)}</div></div>
+      <div class="bar-track">\${barFill(v,maxTool)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No tool data yet.</div>';
 
   const skillBars = D.skills.length ? D.skills.map(([n,v])=>\`
     <div class="bar-row">
       <span class="bar-name" title="\${n}">\${n}</span>
-      <div class="bar-track"><div class="bar-track-inner">\${cellsForVal(v,maxSkill)}</div></div>
+      <div class="bar-track">\${barFill(v,maxSkill)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No skill invocations yet.</div>';
 

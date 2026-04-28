@@ -159,7 +159,7 @@ try {
     state.turns++;
 
     if (tool === 'Skill') {
-      const skillName = hook.tool_input?.skill_name || hook.tool_input?.name || '';
+      const skillName = hook.tool_input?.skill || hook.tool_input?.skill_name || hook.tool_input?.name || '';
       if (skillName) {
         if (!state.skills.includes(skillName)) state.skills.push(skillName);
         const pavedMatch = Object.keys(pavedMap).find(n =>
