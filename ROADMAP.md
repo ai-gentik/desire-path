@@ -128,15 +128,58 @@ Moving from "count what happened" to "understand why":
 
 ---
 
+---
+
+## 5. Prompt quality analysis
+
+> "I notice you do X — but Y would get better results."
+
+Detect anti-patterns in the user's prompts and surface improvement suggestions:
+
+- **Vague openers**: "do X", "fix Y" without context — suggest adding file paths or reproducing steps
+- **Repeated clarification loops**: user sends a prompt, then immediately sends a correction → the original prompt was underspecified
+- **Long monologue prompts**: >500 words that could be broken into steps
+- **Over-delegation**: asking Claude to "figure out" architecture rather than specifying constraints
+
+This is different from desire paths — it's not about workflow automation, it's about prompting skill. Output: periodic suggestions like "Your last 3 sessions had 2+ correction turns each — shorter, more specific prompts tend to land better on the first try."
+
+**Data needed:** prompt text (already stored, truncated at 250 chars), correction-turn detection (prompt follows a tool result quickly), turn count per session.
+
+**Privacy note:** prompts may contain sensitive content — suggestions should be based on structural patterns (length, correction rate), not prompt content itself.
+
+---
+
+## 6. Session timing / prompt caching awareness
+
+Prompt cache TTL in Claude is **5 minutes**. After a 5-minute pause mid-session, the cache expires and the next turn re-reads the full context — slower and more expensive.
+
+Desire-path could detect and surface this:
+
+- **Session gap detection**: log timestamps between turns (not just session start/stop). If gap > 5 min mid-session, flag it.
+- **Cache-miss pattern**: user frequently pauses mid-session → suggest breaking work into shorter focused sessions rather than one long interrupted one
+- **Dashboard stat**: "estimated cache hits" — turns within 5 min of previous turn vs. cache-miss turns
+- **Proactive nudge**: if a session has been idle 4+ minutes, surface a reminder: "cache expires in ~1 min — wrap up this context or keep typing"
+
+**Why this matters:** a user who pauses for coffee mid-session unknowingly pays the cache-miss cost every time. Surfacing this turns an invisible cost into an actionable habit change.
+
+**Data needed:** turn-level timestamps (not currently captured — today we only have session start/stop). Would require logger changes to record each UserPromptSubmit timestamp.
+
+---
+
 ## Priority order
 
-| # | Item | Effort | Value |
-|---|------|--------|-------|
-| 1 | Activity heatmap (session timestamps already exist) | Low | High |
-| 2 | Repeated bash → hook suggester | Medium | High |
-| 3 | Permission denial tracking | Low | Medium |
-| 4 | Skill invocation outcome tracking | Medium | High |
-| 5 | Stale skill detector | Low | Medium |
-| 6 | File co-access patterns | Medium | Medium |
-| 7 | Tool co-occurrence matrix | Medium | Low |
-| 8 | Conversation topic clustering | High | Medium |
+| # | Item | Effort | Value | Status |
+|---|------|--------|-------|--------|
+| 1 | Activity heatmap | Low | High | ✅ done |
+| 2 | Weekday × hour heatmap | Low | High | ✅ done |
+| 3 | Repeated bash → hook suggester | Medium | High | ✅ done |
+| 4 | Maturity stage badge | Low | Medium | ✅ done |
+| 5 | Fix assistant-driven false positives | Low | High | ✅ done |
+| 6 | Permission denial tracking | Low | Medium | — |
+| 7 | Skill invocation outcome tracking | Medium | High | — |
+| 8 | Stale skill detector | Low | Medium | — |
+| 9 | Prompt quality analysis | High | High | — |
+| 10 | Session timing / cache-miss awareness | Medium | Medium | — |
+| 11 | File co-access patterns | Medium | Medium | — |
+| 12 | Tool co-occurrence matrix | Medium | Low | — |
+| 13 | Conversation topic clustering | High | Medium | — |

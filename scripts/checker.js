@@ -119,23 +119,35 @@ function detect(sessions) {
     });
   }
 
-  // 5. BASH command repeated across sessions — candidate for alias/skill/hook
-  const bashFreq = {};
+  // 5. BASH command repeated across sessions — candidate for Start/Stop hook or skill
+  // Count by distinct sessions, not raw runs, to avoid single-session noise
+  const bashSessionCount = {};
   sessions.forEach(s => {
-    (s.top_bash || []).forEach(([cmd, n]) => {
-      bashFreq[cmd] = (bashFreq[cmd] || 0) + n;
+    const seen = new Set();
+    (s.top_bash || []).forEach(([cmd]) => {
+      // Normalize: strip leading path tokens, lowercase, max 80 chars
+      const key = cmd.trim().replace(/^(node|npx|sudo)\s+/, '').toLowerCase().substring(0, 80);
+      if (key.length < 4 || seen.has(key)) return;
+      seen.add(key);
+      bashSessionCount[key] = (bashSessionCount[key] || 0) + 1;
     });
   });
-  const topBash = Object.entries(bashFreq).sort((a,b) => b[1]-a[1])[0];
-  if (topBash && topBash[1] >= 4) {
-    const [cmd, count] = topBash;
+  const topBashEntry = Object.entries(bashSessionCount).sort((a,b) => b[1]-a[1])[0];
+  if (topBashEntry && topBashEntry[1] >= 3) {
+    const [cmd, sessionCount] = topBashEntry;
     const short = cmd.length > 60 ? cmd.substring(0, 57) + '...' : cmd;
+    // Classify hook event: setup/server cmds → Start, test/status cmds → Stop
+    const isStopCandidate = /git (status|diff|log)|npm test|jest|pytest|make test|lint/.test(cmd);
+    const isStartCandidate = /npm (install|run dev|start)|yarn (dev|start)|docker|brew/.test(cmd);
+    const hookEvent = isStopCandidate ? 'Stop' : isStartCandidate ? 'Start' : null;
+    const artifactType = hookEvent ? 'hook' : 'skill';
+    const artifactLabel = hookEvent ? `${hookEvent} hook` : '/command skill';
     results.push({
-      type: 'skill',
-      confidence: count >= 8 ? 'high' : 'medium',
-      frequency: count,
-      description: `You keep running \`${short}\` (${count}×) — a /command or hook would eliminate the repetition`,
-      artifact: 'skill',
+      type: artifactType,
+      confidence: sessionCount >= 6 ? 'high' : 'medium',
+      frequency: sessionCount,
+      description: `You run \`${short}\` in ${sessionCount} sessions — a ${artifactLabel} would automate this`,
+      artifact: artifactLabel,
       action: 'run /desire-path:suggest to pave it'
     });
   }

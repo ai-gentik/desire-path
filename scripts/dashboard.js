@@ -55,6 +55,19 @@ sessions.forEach(s=>{if(s.at){const k=s.at.slice(0,10);if(k in dayMap)dayMap[k]+
 const hourMap = Array(24).fill(0);
 sessions.forEach(s=>{if(s.at)hourMap[new Date(s.at).getHours()]++;});
 
+// Top bash commands by session frequency
+const bashSessionCount = {};
+sessions.forEach(s => {
+  const seen = new Set();
+  (s.top_bash || []).forEach(([cmd]) => {
+    const key = cmd.trim().replace(/^(node|npx|sudo)\s+/,'').toLowerCase().substring(0,80);
+    if (key.length < 4 || seen.has(key)) return;
+    seen.add(key);
+    bashSessionCount[key] = (bashSessionCount[key] || 0) + 1;
+  });
+});
+const topBashCmds = Object.entries(bashSessionCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
 // Weekday × hour heatmap (7 days × 24 hours), 0=Mon … 6=Sun
 const heatGrid = Array.from({length:7},()=>Array(24).fill(0));
 sessions.forEach(s=>{
@@ -120,6 +133,7 @@ const DATA = {
   heatGrid,
   tools: topTools,
   skills: topSkills,
+  bashCmds: topBashCmds,
   paved: pavedEnriched,
   patterns: detectedPaths,
   suggestions: allSuggestions,
@@ -513,6 +527,16 @@ function buildOverview(){
       <td class="r"><span class="t-status \${p.working?'working':'growing'}">\${p.working?'walked':'overgrown'}</span></td>
     </tr>\`).join("") : '<tr><td colspan="6"><div class="empty">Nothing paved yet — say yes to a suggestion.</div></td></tr>';
 
+  const isStopCmd = (c)=>/git (status|diff|log)|npm test|jest|pytest|make test|lint/.test(c);
+  const isStartCmd = (c)=>/npm (install|run dev|start)|yarn (dev|start)|docker|brew/.test(c);
+  const bashTag = (c)=>isStopCmd(c)?'Stop hook':isStartCmd(c)?'Start hook':'skill';
+  const bashRows = D.bashCmds.length ? D.bashCmds.map(([cmd,n])=>\`
+    <tr>
+      <td><code class="t-name" style="font-size:11px">\${cmd.length>72?cmd.substring(0,69)+'…':cmd}</code></td>
+      <td class="r"><span class="p-tag" style="font-size:9px">\${bashTag(cmd)}</span></td>
+      <td class="r"><span class="t-num">\${n}</span> <span style="color:var(--muted);font-size:10px">sess</span></td>
+    </tr>\`).join('') : '<tr><td colspan="3"><div class="empty">No repeated bash commands yet.</div></td></tr>';
+
   document.getElementById("tab-overview").innerHTML = \`
     <div class="grid-2">
       <div class="panel">
@@ -523,6 +547,13 @@ function buildOverview(){
         <div class="panel-head"><div class="panel-title">Skills · Top 6</div><div class="panel-meta">\${D.skills.reduce((a,b)=>a+b[1],0)} invocations</div></div>
         <div class="bars">\${skillBars}</div>
       </div>
+    </div>
+    <div class="panel" style="padding:0;margin-bottom:16px">
+      <div class="panel-head" style="padding:14px 20px">
+        <div class="panel-title">Repeated Bash Commands · hook candidates</div>
+        <div class="panel-meta">\${D.bashCmds.length} distinct commands · by session frequency</div>
+      </div>
+      <table class="tbl"><thead><tr><th>Command</th><th class="r">Candidate</th><th class="r">Sessions</th></tr></thead><tbody>\${bashRows}</tbody></table>
     </div>
     <div class="grid-2">
       <div class="panel">
