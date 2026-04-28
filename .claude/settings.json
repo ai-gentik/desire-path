@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(ls -d ~/.claude/plugins/cache/ai-gentik/desire-path/*/ | sort -V | tail -1)scripts/dashboard.js\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
