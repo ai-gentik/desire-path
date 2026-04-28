@@ -79,11 +79,14 @@ function detect(sessions) {
   }
 
   // 3. HOOK candidate: same tool always followed by same tool (sequence)
+  // Filter pairs that are procedurally required by assistant workflow, not user choice
+  const ASSISTANT_PAIRS = new Set(['Read→Edit','Read→Write','Bash→Bash','Read→Bash','Bash→Read']);
   const pairMap = {};
   sessions.forEach(s => {
     const tools = Object.keys(s.tools || {});
     for (let i = 0; i < tools.length - 1; i++) {
       const pair = `${tools[i]}→${tools[i+1]}`;
+      if (ASSISTANT_PAIRS.has(pair)) continue;
       pairMap[pair] = (pairMap[pair] || 0) + 1;
     }
   });

@@ -73,6 +73,14 @@ usageRaw.forEach(u=>{
   if(!cur||u.at>cur)usageByArtifact[u.artifact_name].last_used=u.at;
 });
 
+// Maturity stage
+const _s = totalSessions, _p = paved.length, _pat = (analysis?.top_paths||[]).length;
+const _w = paved.filter(p=>(usageByArtifact[p.name]?.total_uses||0)>=2).length;
+const stage = _s < 5 || _pat === 0 ? 'WANDERING'
+  : _p < 2                          ? 'WEARING'
+  : _w < Math.ceil(_p * 0.5)        ? 'PAVING'
+  :                                   'WALKING';
+
 const pavedEnriched = paved.map(p=>({
   ...p,
   uses: usageByArtifact[p.name]?.total_uses||0,
@@ -120,6 +128,7 @@ const DATA = {
   generatedAt: new Date().toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}),
   pendingCount: allSuggestions.filter(s=>s.outcome==='pending').length,
   deadCount: (inventory.artifacts||[]).filter(a=>a.status==='dead').length,
+  stage,
 };
 
 // ── HTML (Observatory — self-contained, vanilla JS) ──────────────────────────
@@ -156,6 +165,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .strip-mid span b{color:var(--ink);font-weight:500}
 .strip-right{color:var(--muted);font-size:10px;letter-spacing:.08em}
 .strip-right b{color:var(--ink-2)}
+.stage-badge{font-size:9px;letter-spacing:.2em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--signal);color:var(--signal);font-weight:500}
 
 .hero{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:16px}
 .hero-l{padding:32px 28px 28px;border:1px solid var(--line);background:var(--panel);position:relative;overflow:hidden}
@@ -324,7 +334,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
     <span>pending <b style="color:var(--signal)">${DATA.pendingCount}</b></span>
     <span>dead <b style="color:var(--warn)">${DATA.deadCount}</b></span>
   </div>
-  <div class="strip-right">v4 · observatory · <b>${DATA.generatedAt}</b></div>
+  <div class="strip-right" style="display:flex;gap:12px;align-items:center"><span class="stage-badge">${DATA.stage}</span><span>v4 · observatory · <b>${DATA.generatedAt}</b></span></div>
 </div>
 
 <div class="hero">
