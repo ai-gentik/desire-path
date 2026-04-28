@@ -14,7 +14,11 @@ Arguments: `$ARGUMENTS`
 ## Step 1 — Load the pattern
 
 If `$ARGUMENTS` is empty or "latest":
-- Read `~/.claude/desire-path/last-suggestion.json` for the most recently detected pattern.
+1. Read `~/.claude/desire-path/suggestions.jsonl` and collect all `pattern.type` values where `outcome === "accepted"` → call this `acceptedTypes`.
+2. Read `~/.claude/desire-path/latest-analysis.json`. Find the highest-ranked entry in `top_paths` whose `type` is **not** in `acceptedTypes`. If found, use that as the pattern.
+3. If no unpaved pattern found in `top_paths`, fall back to `~/.claude/desire-path/last-suggestion.json`.
+
+Tell the user which pattern you're paving and how many unpaved ones remain (e.g. "Paving pattern 2 of 5 unpaved — X more after this.").
 
 Otherwise use `$ARGUMENTS` as the description of the workflow to pave.
 

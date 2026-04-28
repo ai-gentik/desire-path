@@ -745,7 +745,11 @@ function buildMap(){
   const allArtifacts = [...paved, ...extraDead, ...sessionSkills, ...sessionCmds, ...sessionAgents];
 
   // Detected-but-not-paved patterns become dashed "desire lines"
+  const acceptedTypeSet = new Set(
+    (D.suggestions||[]).filter(s=>s.outcome==='accepted').map(s=>s.pattern?.type).filter(Boolean)
+  );
   let desireLines = (D.patterns||[]).filter(p=>{
+    if (acceptedTypeSet.has(p.type)) return false;
     const n = p.suggested_artifact?.name || p.name;
     return !n || !allArtifacts.find(a=>a.name===n);
   }).slice(0,5);
@@ -1143,9 +1147,10 @@ function buildSignals(){
 function buildPatterns(){
   const maxFreq = Math.max(...D.patterns.map(p=>p.frequency||p.freq||1),1);
   const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.description||s.desc||''));
+  const acceptedTypes = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.type).filter(Boolean));
   const pats = D.patterns.length ? D.patterns.map((p,i)=>{
     const desc = p.description||p.desc||'';
-    const acted = acceptedDescs.has(desc);
+    const acted = acceptedDescs.has(desc) || acceptedTypes.has(p.type);
     return \`
     <div class="pattern\${acted?' pattern-acted':''}">
       <div class="p-rank">\${String(i+1).padStart(2,"0")}</div>
@@ -1180,7 +1185,7 @@ function buildPatterns(){
   document.getElementById("tab-patterns").innerHTML = \`
     <div class="panel-head" style="border:1px solid var(--line);background:var(--panel);padding:14px 20px;margin-bottom:8px">
       <div class="panel-title">Detected Patterns · ranked by frequency</div>
-      <div class="panel-meta">\${D.patterns.length} active patterns · re-scanned every 5 sessions</div>
+      <div class="panel-meta">\${D.patterns.filter(p=>!acceptedTypes.has(p.type)).length} unpaved · \${D.patterns.length} total · re-scanned every 5 sessions</div>
     </div>
     \${pats}
     <div class="panel-head" style="border:1px solid var(--line);background:var(--panel);padding:14px 20px;margin:24px 0 8px">

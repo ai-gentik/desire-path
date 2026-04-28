@@ -17,6 +17,8 @@ You are the Desire Path Pattern Detector. You study how this developer actually 
 ## Your job
 
 Read `~/.claude/desire-path/sessions.jsonl` (all entries).
+Read `~/.claude/desire-path/sessions-archive.json` and note its `total_sessions` field.
+Total sessions = sessions.jsonl line count + sessions-archive.json `total_sessions`. Use this as `_session_count_at_analysis`.
 Cross-reference with `~/.claude/desire-path/paved.jsonl`.
 Scan `~/.claude/settings.json` for existing hooks.
 List `~/.claude/skills/` and `~/.claude/agents/`.
