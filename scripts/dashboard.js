@@ -345,6 +345,50 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .foot em{font-family:'Fraunces',serif;font-style:italic;text-transform:none;letter-spacing:0;font-size:13px;color:var(--muted)}
 
 .empty{color:var(--muted);font-size:12px;padding:20px;text-align:center;border:1px dashed var(--line);background:var(--panel)}
+
+/* ── Aerial Map ─────────────────────────────────────────────── */
+.map-wrap{position:relative;border:1px solid var(--line);background:#13110d;overflow:hidden}
+.map-svg{display:block;width:100%;height:auto;background:
+  radial-gradient(ellipse at 50% 45%, oklch(0.22 0.04 110/.6) 0%, transparent 55%),
+  radial-gradient(ellipse at 30% 80%, oklch(0.20 0.05 130/.4) 0%, transparent 50%),
+  radial-gradient(ellipse at 75% 25%, oklch(0.21 0.05 100/.45) 0%, transparent 55%),
+  linear-gradient(160deg, oklch(0.16 0.02 100) 0%, oklch(0.13 0.02 90) 100%)}
+.map-grain{position:absolute;inset:0;pointer-events:none;opacity:.08;mix-blend-mode:overlay;
+  background-image:radial-gradient(circle at 1px 1px, oklch(0.55 0.06 90) 1px, transparent 0);
+  background-size:3px 3px}
+.map-vignette{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 50%, oklch(0.08 0.01 90/.6) 100%)}
+
+.map-legend{position:absolute;left:18px;bottom:18px;background:oklch(0.12 0.02 90/.85);border:1px solid var(--line);padding:12px 14px;font-size:10px;letter-spacing:.05em;color:var(--ink-2);backdrop-filter:blur(4px);max-width:220px}
+.map-legend-title{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:500}
+.map-legend-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px}
+.map-legend-row:last-child{margin-bottom:0}
+.map-legend-swatch{width:22px;height:2px;flex-shrink:0}
+.map-legend-pin{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+.map-meta{position:absolute;right:18px;top:18px;background:oklch(0.12 0.02 90/.85);border:1px solid var(--line);padding:10px 14px;font-size:10px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;backdrop-filter:blur(4px)}
+.map-meta b{color:var(--signal);font-weight:500}
+
+.map-compass{position:absolute;left:18px;top:18px;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:oklch(0.12 0.02 90/.85);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:14px;color:var(--muted);font-style:italic;backdrop-filter:blur(4px)}
+
+.map-cap{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
+.map-cap-title{font-family:'Fraunces',serif;font-size:18px;font-weight:400;font-style:italic;color:var(--ink);letter-spacing:-.005em}
+.map-cap-sub{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+.map-pin-label{font-family:'JetBrains Mono',monospace;font-size:9px;fill:var(--ink-2);letter-spacing:.04em;paint-order:stroke;stroke:oklch(0.12 0.02 90/.9);stroke-width:3px;stroke-linejoin:round}
+.map-pin-uses{font-family:'Fraunces',serif;font-size:11px;fill:var(--signal);font-style:italic;paint-order:stroke;stroke:oklch(0.12 0.02 90/.95);stroke-width:3px}
+
+.map-origin-label{font-family:'Fraunces',serif;font-size:11px;fill:var(--muted);font-style:italic;letter-spacing:.04em;paint-order:stroke;stroke:oklch(0.12 0.02 90/.9);stroke-width:3px}
+
+.map-key{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line)}
+.map-key-cell{padding:14px 18px;border-right:1px solid var(--line)}
+.map-key-cell:last-child{border-right:none}
+.map-key-n{font-family:'Fraunces',serif;font-size:24px;font-weight:300;line-height:1}
+.map-key-n.signal{color:var(--signal)}
+.map-key-n.good{color:var(--good)}
+.map-key-n.warn{color:var(--warn)}
+.map-key-lbl{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.map-key-meta{font-size:10px;color:var(--ink-2);margin-top:3px;font-style:italic;font-family:'Fraunces',serif}
 </style>
 </head>
 <body>
@@ -398,12 +442,14 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 
 <nav class="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="map">Map</button>
   <button class="tab" data-tab="signals">Signals</button>
   <button class="tab" data-tab="patterns">Patterns <span class="count" id="t-pat"></span></button>
   <button class="tab" data-tab="inventory">Inventory <span class="count" id="t-inv"></span></button>
 </nav>
 
 <div id="tab-overview"></div>
+<div id="tab-map" style="display:none"></div>
 <div id="tab-signals" style="display:none"></div>
 <div id="tab-patterns" style="display:none"></div>
 <div id="tab-inventory" style="display:none"></div>
@@ -462,7 +508,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.addEventListener("click",()=>{
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["overview","signals","patterns","inventory"].forEach(id=>{
+    ["overview","map","signals","patterns","inventory"].forEach(id=>{
       document.getElementById("tab-"+id).style.display = id===btn.dataset.tab?"block":"none";
     });
   });
@@ -540,6 +586,241 @@ function buildOverview(){
         <thead><tr><th>Name</th><th>Type</th><th class="r">Trend</th><th class="r">Uses</th><th class="r">Last</th><th class="r">Status</th></tr></thead>
         <tbody>\${pavedRows}</tbody>
       </table>
+    </div>
+  \`;
+}
+
+function buildMap(){
+  const W = 1340, H = 720;
+  const cx = W/2, cy = H/2 + 20;
+
+  const TYPE_COLORS = {
+    skill:'#d4a55a', hook:'#7fb285', agent:'#9a8db3',
+    claude_md:'#c8a96a', command:'#a89776', plugin:'#bfb6a3'
+  };
+
+  // Combine paved + dead/stale inventory items so the map shows the full landscape.
+  const paved = D.paved||[];
+  const inv = D.inventory||[];
+  const extraDead = inv.filter(a=>['dead','stale'].includes(a.status) && !paved.find(p=>p.name===a.name))
+    .map(a=>({...a, uses:a.uses||0, last_used:a.last_used||a.last, working:false, _ghost:a.status}));
+  const allArtifacts = [...paved, ...extraDead];
+
+  // Detected-but-not-paved patterns become dashed "desire lines"
+  const desireLines = (D.patterns||[]).filter(p=>{
+    const n = p.suggested_artifact?.name || p.name;
+    return !n || !allArtifacts.find(a=>a.name===n);
+  }).slice(0,5);
+
+  // ── Layout: place artifacts in a sun/spoke pattern around center ──
+  const N = allArtifacts.length;
+  const positions = allArtifacts.map((a,i)=>{
+    // Working items go closer in (well-trodden), dead/stale push out (overgrown edges)
+    const ring = a._ghost==='dead' ? 0.92
+               : a._ghost==='stale' ? 0.78
+               : a.working ? 0.50 + Math.min(0.18, (a.uses||0)*0.015)
+               : 0.62;
+    const baseRadius = Math.min(W,H) * 0.42 * ring;
+    // Spread evenly but jitter so it feels organic
+    const golden = 2.39996;
+    const angle = i * golden + (a.type==='skill'?0:a.type==='hook'?0.6:1.2);
+    const jitter = (Math.sin(i*7.3)*0.5 + Math.cos(i*3.1)*0.3) * 30;
+    return {
+      x: cx + Math.cos(angle) * baseRadius + jitter,
+      y: cy + Math.sin(angle) * baseRadius * 0.78 + Math.cos(i*1.7)*18,
+      a, angle
+    };
+  });
+
+  // Helper: bezier path from origin to a point with a hand-drawn wobble
+  const trail = (x1,y1,x2,y2,wobble=1)=>{
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const dx=x2-x1, dy=y2-y1;
+    const len=Math.hypot(dx,dy);
+    const nx=-dy/len, ny=dx/len;
+    const o1 = (Math.sin(x2*0.03)+Math.cos(y2*0.04))*40*wobble;
+    const o2 = (Math.cos(x2*0.05)+Math.sin(y2*0.03))*30*wobble;
+    const c1x = x1 + dx*0.32 + nx*o1;
+    const c1y = y1 + dy*0.32 + ny*o1;
+    const c2x = x1 + dx*0.68 + nx*o2;
+    const c2y = y1 + dy*0.68 + ny*o2;
+    return \`M \${x1.toFixed(1)} \${y1.toFixed(1)} C \${c1x.toFixed(1)} \${c1y.toFixed(1)}, \${c2x.toFixed(1)} \${c2y.toFixed(1)}, \${x2.toFixed(1)} \${y2.toFixed(1)}\`;
+  };
+
+  // ── Draw layered grass / topo background lines ──
+  let topo = '';
+  for(let r=80; r<Math.max(W,H)*0.7; r+=70){
+    topo += \`<ellipse cx="\${cx}" cy="\${cy}" rx="\${r*1.05}" ry="\${r*0.78}" fill="none" stroke="oklch(0.30 0.04 100/.18)" stroke-width="0.6" stroke-dasharray="2 6" />\`;
+  }
+
+  // Background "scrub" — random tiny strokes suggesting grass/terrain
+  let grass = '';
+  for(let i=0;i<260;i++){
+    const gx = (i*73 % W);
+    const gy = (i*131 % H);
+    // skip near center / paths
+    const dc = Math.hypot(gx-cx, gy-cy);
+    if(dc < 80) continue;
+    const len = 2 + (i%4);
+    const ang = (i*0.7) % (Math.PI*2);
+    grass += \`<line x1="\${gx}" y1="\${gy}" x2="\${gx+Math.cos(ang)*len}" y2="\${gy+Math.sin(ang)*len}" stroke="oklch(0.42 0.06 110/.35)" stroke-width="0.6" />\`;
+  }
+
+  // ── Desire lines (detected but not paved) — dashed "where people walk in grass" ──
+  let desire = '';
+  desireLines.forEach((p,i)=>{
+    const angle = (i / Math.max(1,desireLines.length)) * Math.PI*2 + 0.3;
+    const r = Math.min(W,H) * 0.36;
+    const ex = cx + Math.cos(angle)*r;
+    const ey = cy + Math.sin(angle)*r*0.78;
+    const path = trail(cx, cy, ex, ey, 1.4);
+    const label = p.description || p.desc || p.suggested_artifact?.trigger || 'unnamed';
+    const labelShort = label.length>32 ? label.slice(0,29)+'…' : label;
+    desire += \`
+      <path d="\${path}" fill="none" stroke="oklch(0.65 0.12 80/.55)" stroke-width="1.4" stroke-dasharray="3 7" stroke-linecap="round" />
+      <circle cx="\${ex}" cy="\${ey}" r="3" fill="none" stroke="oklch(0.70 0.14 80)" stroke-width="1" stroke-dasharray="2 2" />
+      <text x="\${ex + (Math.cos(angle)>0?10:-10)}" y="\${ey+3}" text-anchor="\${Math.cos(angle)>0?'start':'end'}" class="map-pin-label" style="fill:oklch(0.70 0.14 80);font-style:italic">⌁ \${labelShort}</text>
+    \`;
+  });
+
+  // ── Paved trails (paths from origin to each artifact pin) ──
+  let trails = '';
+  positions.forEach(({x,y,a})=>{
+    const uses = a.uses||0;
+    const ghost = a._ghost;
+    const path = trail(cx, cy, x, y, ghost?1.2:0.9);
+
+    let stroke, width, opacity, dash='';
+    if(ghost==='dead'){
+      stroke = 'oklch(0.40 0.05 30)'; width = 1.2; opacity = 0.4; dash = 'stroke-dasharray="1 5"';
+    } else if(ghost==='stale'){
+      stroke = 'oklch(0.55 0.08 80)'; width = 1.6; opacity = 0.55; dash = 'stroke-dasharray="4 4"';
+    } else if(a.working){
+      // well-walked → wide, warm, solid (a real beaten path)
+      const intensity = Math.min(1, uses/15);
+      stroke = \`oklch(\${0.62 + intensity*0.10} \${0.10 + intensity*0.04} 75)\`;
+      width = 3.5 + intensity*4;
+      opacity = 0.85;
+    } else {
+      // paved but not walked yet → thin, pale
+      stroke = 'oklch(0.55 0.04 90)'; width = 1.8; opacity = 0.55;
+    }
+
+    // Halo for the most-walked path
+    if(a.working && uses >= 5){
+      trails += \`<path d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
+    }
+    trails += \`<path d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
+  });
+
+  // ── Pins for artifacts ──
+  let pins = '';
+  positions.forEach(({x,y,a,angle})=>{
+    const color = TYPE_COLORS[a.type] || TYPE_COLORS.command;
+    const uses = a.uses||0;
+    const ghost = a._ghost;
+    const r = ghost ? 4 : a.working ? 6 + Math.min(4, uses*0.3) : 5;
+
+    // Label position — push outward from center
+    const labelDist = r + 12;
+    const lx = x + Math.cos(angle)*labelDist;
+    const ly = y + Math.sin(angle)*labelDist;
+    const anchor = Math.cos(angle) > 0.2 ? 'start' : Math.cos(angle) < -0.2 ? 'end' : 'middle';
+
+    const nameShort = a.name.length>22 ? a.name.slice(0,20)+'…' : a.name;
+    const nameStyle = ghost==='dead' ? \`text-decoration:line-through;fill:oklch(0.50 0.03 80)\` : '';
+
+    // Outer glow for working artifacts
+    if(a.working){
+      pins += \`<circle cx="\${x}" cy="\${y}" r="\${r+5}" fill="\${color}" opacity="0.18" />\`;
+    }
+    // Pin body
+    pins += \`<circle cx="\${x}" cy="\${y}" r="\${r}" fill="\${ghost?'none':color}" stroke="\${color}" stroke-width="\${ghost?1.4:1}" opacity="\${ghost==='dead'?0.5:1}" \${ghost==='dead'?'stroke-dasharray="2 2"':''} />\`;
+    // Inner mark
+    if(!ghost) pins += \`<circle cx="\${x}" cy="\${y}" r="\${Math.max(1.5,r*0.35)}" fill="oklch(0.13 0.02 90)" />\`;
+
+    // Label
+    pins += \`<text x="\${lx}" y="\${ly+3}" text-anchor="\${anchor}" class="map-pin-label" style="\${nameStyle}">\${nameShort}</text>\`;
+    // Use count for working items
+    if(a.working && uses>0){
+      pins += \`<text x="\${lx}" y="\${ly+15}" text-anchor="\${anchor}" class="map-pin-uses">\${uses}×</text>\`;
+    } else if(ghost==='dead'){
+      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.55 0.10 30);font-style:italic">overgrown</text>\`;
+    } else if(ghost==='stale'){
+      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.65 0.08 80);font-style:italic">stale · \${a.age||0}d</text>\`;
+    } else if(!a.working){
+      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:var(--muted);font-style:italic">freshly paved</text>\`;
+    }
+  });
+
+  // ── Origin marker (you / sessions) ──
+  const totalSess = D.totalSessions;
+  const origin = \`
+    <circle cx="\${cx}" cy="\${cy}" r="38" fill="none" stroke="oklch(0.70 0.14 75/.25)" stroke-width="1" />
+    <circle cx="\${cx}" cy="\${cy}" r="22" fill="none" stroke="oklch(0.70 0.14 75/.45)" stroke-width="1" />
+    <circle cx="\${cx}" cy="\${cy}" r="10" fill="oklch(0.70 0.14 75)" />
+    <circle cx="\${cx}" cy="\${cy}" r="4" fill="oklch(0.13 0.02 90)" />
+    <text x="\${cx}" y="\${cy+58}" text-anchor="middle" class="map-origin-label">you · \${totalSess} sessions</text>
+  \`;
+
+  // ── Stats summary (bottom strip) ──
+  const walked = paved.filter(p=>p.working).length;
+  const overgrown = inv.filter(a=>a.status==='dead').length;
+  const stale = inv.filter(a=>a.status==='stale').length;
+  const desireCount = desireLines.length;
+
+  document.getElementById("tab-map").innerHTML = \`
+    <div class="map-wrap">
+      <div class="map-cap">
+        <div class="map-cap-title">An aerial view of how you actually work.</div>
+        <div class="map-cap-sub">\${allArtifacts.length} artifacts · \${desireCount} desire lines</div>
+      </div>
+      <div style="position:relative">
+        <svg class="map-svg" viewBox="0 0 \${W} \${H}" preserveAspectRatio="xMidYMid meet">
+          <g opacity="0.6">\${topo}</g>
+          <g>\${grass}</g>
+          <g>\${desire}</g>
+          <g>\${trails}</g>
+          <g>\${origin}</g>
+          <g>\${pins}</g>
+        </svg>
+        <div class="map-grain"></div>
+        <div class="map-vignette"></div>
+        <div class="map-compass">N</div>
+        <div class="map-meta">scale · <b>\${totalSess} sess</b> · \${D.pipeline.acceptRate}% acc</div>
+        <div class="map-legend">
+          <div class="map-legend-title">Legend</div>
+          <div class="map-legend-row"><span class="map-legend-swatch" style="background:oklch(0.72 0.14 75);height:4px"></span> walked path</div>
+          <div class="map-legend-row"><span class="map-legend-swatch" style="background:oklch(0.55 0.04 90)"></span> freshly paved</div>
+          <div class="map-legend-row"><span class="map-legend-swatch" style="background:oklch(0.55 0.08 80);background-image:linear-gradient(90deg,transparent 50%,oklch(0.55 0.08 80) 50%);background-size:8px 100%"></span> stale</div>
+          <div class="map-legend-row"><span class="map-legend-swatch" style="background:oklch(0.65 0.12 80);background-image:linear-gradient(90deg,transparent 70%,oklch(0.65 0.12 80) 70%);background-size:10px 100%"></span> desire line — not yet paved</div>
+          <div class="map-legend-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><span class="map-legend-pin" style="background:#d4a55a"></span> skill</div>
+          <div class="map-legend-row"><span class="map-legend-pin" style="background:#7fb285"></span> hook</div>
+          <div class="map-legend-row"><span class="map-legend-pin" style="background:#9a8db3"></span> agent</div>
+        </div>
+      </div>
+      <div class="map-key">
+        <div class="map-key-cell">
+          <div class="map-key-n good">\${walked}</div>
+          <div class="map-key-lbl">Walked paths</div>
+          <div class="map-key-meta">worn smooth by use</div>
+        </div>
+        <div class="map-key-cell">
+          <div class="map-key-n signal">\${desireCount}</div>
+          <div class="map-key-lbl">Desire lines</div>
+          <div class="map-key-meta">where you're cutting through grass</div>
+        </div>
+        <div class="map-key-cell">
+          <div class="map-key-n">\${stale}</div>
+          <div class="map-key-lbl">Going stale</div>
+          <div class="map-key-meta">paved but quiet</div>
+        </div>
+        <div class="map-key-cell">
+          <div class="map-key-n warn">\${overgrown}</div>
+          <div class="map-key-lbl">Overgrown</div>
+          <div class="map-key-meta">never walked — reclaim</div>
+        </div>
+      </div>
     </div>
   \`;
 }
@@ -712,6 +993,7 @@ function buildInventory(){
 }
 
 buildOverview();
+buildMap();
 buildSignals();
 buildPatterns();
 buildInventory();
