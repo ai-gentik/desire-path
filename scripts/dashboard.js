@@ -309,7 +309,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 
 .pattern{display:grid;grid-template-columns:48px 1fr 110px 90px;gap:18px;padding:18px 20px;border:1px solid var(--line);background:var(--panel);margin-bottom:8px;align-items:center}
 .p-rank{font-family:'Fraunces',serif;font-size:24px;color:var(--muted);font-weight:300}
-.p-quote{font-family:'Fraunces',serif;font-size:18px;font-weight:400;color:var(--ink);line-height:1.4;margin-bottom:8px;letter-spacing:-.005em}
+.p-quote{font-size:14px;color:var(--ink);line-height:1.6;margin-bottom:8px}
 .p-meta{display:flex;gap:10px;align-items:center}
 .p-tag{font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line-2);color:var(--ink-2)}
 .p-trigger{font-size:10px;color:var(--muted)}
