@@ -276,7 +276,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .tbl tbody td.r{text-align:right}
 .tbl tbody tr:hover{background:var(--panel-2)}
 .t-name{color:var(--ink);font-weight:500}
-.t-type{color:var(--muted);font-size:10px;letter-spacing:.04em}
+.t-type{color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:lowercase}
 .t-num{color:var(--ink);font-variant-numeric:tabular-nums}
 .t-num.zero{color:var(--faint)}
 .t-when{color:var(--muted);font-size:10px}
