@@ -1146,11 +1146,14 @@ function buildSignals(){
 
 function buildPatterns(){
   const maxFreq = Math.max(...D.patterns.map(p=>p.frequency||p.freq||1),1);
-  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.description||s.desc||''));
-  const acceptedTypes = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.type).filter(Boolean));
+  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted'||s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
+  const acceptedTypes = new Set(D.suggestions.filter(s=>s.outcome==='accepted'||s.outcome==='dismissed').map(s=>s.pattern?.type).filter(Boolean));
+  const dismissedDescs = new Set(D.suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
+  const dismissedTypes = new Set(D.suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.type).filter(Boolean));
   const pats = D.patterns.length ? D.patterns.map((p,i)=>{
     const desc = p.description||p.desc||'';
     const acted = acceptedDescs.has(desc) || acceptedTypes.has(p.type);
+    const dismissed = dismissedDescs.has(desc) || dismissedTypes.has(p.type);
     return \`
     <div class="pattern\${acted?' pattern-acted':''}">
       <div class="p-rank">\${String(i+1).padStart(2,"0")}</div>
@@ -1159,7 +1162,7 @@ function buildPatterns(){
         <div class="p-meta">
           <span class="t-type" style="color:\${typeCol(p.type)}">\${p.type||'pattern'}</span>
           <span class="p-trigger">trigger · <b>\${p.suggested_artifact?.trigger||p.tag||'—'}</b></span>
-          \${acted?'<span class="p-acted">paved</span>':''}
+          \${dismissed?'<span class="p-acted" style="opacity:.5">dismissed</span>':acted?'<span class="p-acted">paved</span>':''}
         </div>
       </div>
       <div class="p-strength">
