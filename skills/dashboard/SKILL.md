@@ -10,9 +10,14 @@ description: >
 
 Run:
 ```bash
-node "$(ls -d ~/.claude/plugins/cache/ai-gentik/desire-path/*/ | sort -V | tail -1)scripts/dashboard.js"
+open http://localhost:2337
 ```
 
-The script opens `~/.claude/desire-path/dashboard.html` in the browser automatically.
-Do NOT run a separate `open` command — the script already handles this.
-If the browser doesn't open, tell the user the path to open manually.
+The dashboard is a live server that starts automatically at session start and refreshes every 60 seconds.
+
+If the page doesn't load, the server isn't running. Start it manually with:
+```bash
+node $CLAUDE_PLUGIN_ROOT/scripts/server.js &
+```
+
+To stop the server, use `/desire-path:stop-server`.
