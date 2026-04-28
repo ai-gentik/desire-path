@@ -393,6 +393,68 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .map-key-n.warn{color:var(--warn)}
 .map-key-lbl{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .map-key-meta{font-size:10px;color:var(--ink-2);margin-top:3px;font-style:italic;font-family:'Fraunces',serif}
+
+/* ── Map: hover, tooltip, animations ─────────────────────────── */
+.map-pin{cursor:pointer;transition:transform .2s ease}
+.map-pin:hover .map-pin-body{filter:brightness(1.4);r:9}
+.map-pin:hover .map-pin-glow{opacity:.45 !important;r:18}
+.map-pin:hover ~ .map-trail-group .map-trail{opacity:.15}
+.map-pin-body{transition:r .2s ease, filter .2s ease}
+.map-pin-glow{transition:opacity .2s ease, r .2s ease}
+.map-trail{cursor:pointer;transition:stroke-width .2s ease, opacity .2s ease}
+.map-trail:hover{stroke-width:8 !important}
+
+/* When pin is hovered, dim other pins via JS — fallback class */
+.map-svg.has-hover .map-pin:not(.is-hover){opacity:.35;transition:opacity .2s ease}
+.map-svg.has-hover .map-trail:not(.is-hover){opacity:.18;transition:opacity .2s ease}
+.map-svg.has-hover .map-trail-glow:not(.is-hover){opacity:.05}
+.map-pin{cursor:pointer}
+.map-desire-group{cursor:pointer}
+.map-pin.is-hover .map-pin-body{filter:drop-shadow(0 0 6px currentColor)}
+.map-pin.is-hover .map-pin-glow{opacity:.45 !important;transition:opacity .2s ease}
+.map-trail.is-hover{opacity:1 !important;filter:drop-shadow(0 0 4px oklch(0.70 0.14 75/.5))}
+.map-trail-glow.is-hover{opacity:.4 !important}
+.map-desire-group:hover .map-desire{stroke:oklch(0.78 0.16 80) !important;stroke-width:2 !important}
+.map-desire-group:hover .map-desire-end{stroke-width:2 !important;r:5}
+
+/* Tooltip */
+.map-tip{position:absolute;pointer-events:none;background:oklch(0.10 0.02 90/.95);border:1px solid var(--signal);padding:10px 14px;font-size:11px;color:var(--ink);min-width:180px;backdrop-filter:blur(6px);z-index:10;opacity:0;transform:translateY(4px);transition:opacity .15s ease, transform .15s ease;box-shadow:0 8px 24px oklch(0.05 0 0/.6)}
+.map-tip.show{opacity:1;transform:translateY(0)}
+.map-tip-name{font-family:'Fraunces',serif;font-size:14px;font-style:italic;color:var(--ink);margin-bottom:6px;letter-spacing:-.005em}
+.map-tip-row{display:flex;justify-content:space-between;gap:14px;margin-top:3px;font-size:10px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.map-tip-row b{color:var(--ink-2);font-weight:500}
+.map-tip-row b.signal{color:var(--signal)}
+.map-tip-row b.good{color:var(--good)}
+.map-tip-row b.warn{color:var(--warn)}
+.map-tip-tag{display:inline-block;font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--line-2);color:var(--ink-2);margin-bottom:8px}
+.map-tip::after{content:'';position:absolute;left:-1px;top:-1px;width:8px;height:8px;border-top:1px solid var(--signal);border-left:1px solid var(--signal)}
+.map-tip::before{content:'';position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;border-bottom:1px solid var(--signal);border-right:1px solid var(--signal)}
+.map-tip-head{display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.map-tip-glyph{color:oklch(0.70 0.14 80);font-size:12px}
+.map-tip-dot{display:inline-block;width:7px;height:7px;border-radius:50%}
+.map-tip-foot{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line-2);font-size:10px;font-style:italic;color:var(--muted);letter-spacing:.02em}
+.map-tip-row code{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink)}
+
+/* Animations — trigger when .map-svg has .play class */
+@keyframes mapTrailDraw{from{stroke-dashoffset:1000}to{stroke-dashoffset:var(--dash-rest,0)}}
+@keyframes mapPinPop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes mapDesireDraw{from{stroke-dashoffset:1200}to{stroke-dashoffset:0}}
+@keyframes mapOriginPulse{0%,100%{r:38;opacity:.25}50%{r:46;opacity:.05}}
+@keyframes mapOriginPulse2{0%,100%{r:22;opacity:.45}50%{r:28;opacity:.15}}
+
+.map-svg.play .map-trail{stroke-dasharray:1000;stroke-dashoffset:1000;animation:mapTrailDraw 1.6s cubic-bezier(.4,0,.2,1) forwards}
+.map-svg.play .map-trail-glow{stroke-dasharray:1000;stroke-dashoffset:1000;animation:mapTrailDraw 1.6s cubic-bezier(.4,0,.2,1) forwards;animation-delay:.05s}
+.map-svg.play .map-desire{stroke-dasharray:3 7;animation:mapDesireDraw 2s cubic-bezier(.4,0,.2,1) forwards}
+.map-svg.play .map-pin{transform-origin:var(--ox,0) var(--oy,0);transform-box:fill-box;animation:mapPinPop .5s cubic-bezier(.34,1.56,.64,1) forwards;opacity:0}
+.map-svg.play .map-origin-ring-1{animation:mapOriginPulse 4s ease-in-out infinite}
+.map-svg.play .map-origin-ring-2{animation:mapOriginPulse2 4s ease-in-out infinite;animation-delay:.5s}
+
+/* Stagger the pins/trails by index (set via inline --i) */
+.map-svg.play .map-trail{animation-delay:calc(var(--i,0) * 80ms)}
+.map-svg.play .map-trail-glow{animation-delay:calc(var(--i,0) * 80ms + 50ms)}
+.map-svg.play .map-pin{animation-delay:calc(var(--i,0) * 80ms + 600ms)}
+.map-svg.play .map-desire{animation-delay:calc(1.4s + var(--i,0) * 100ms)}
+
 </style>
 </head>
 <body>
@@ -690,16 +752,22 @@ function buildMap(){
     const path = trail(cx, cy, ex, ey, 1.4);
     const label = p.description || p.desc || p.suggested_artifact?.trigger || 'unnamed';
     const labelShort = label.length>32 ? label.slice(0,29)+'…' : label;
+    const tipPayload = encodeURIComponent(JSON.stringify({
+      kind:'desire', name:label, type:p.type||'pattern', frequency:p.frequency||p.freq||'?',
+      trigger:p.suggested_artifact?.trigger||''
+    }));
     desire += \`
-      <path d="\${path}" fill="none" stroke="oklch(0.65 0.12 80/.55)" stroke-width="1.4" stroke-dasharray="3 7" stroke-linecap="round" />
-      <circle cx="\${ex}" cy="\${ey}" r="3" fill="none" stroke="oklch(0.70 0.14 80)" stroke-width="1" stroke-dasharray="2 2" />
-      <text x="\${ex + (Math.cos(angle)>0?10:-10)}" y="\${ey+3}" text-anchor="\${Math.cos(angle)>0?'start':'end'}" class="map-pin-label" style="fill:oklch(0.70 0.14 80);font-style:italic">⌁ \${labelShort}</text>
+      <g class="map-desire-group" data-tip="\${tipPayload}" style="--i:\${i}">
+        <path class="map-desire" d="\${path}" fill="none" stroke="oklch(0.65 0.12 80/.55)" stroke-width="1.4" stroke-dasharray="3 7" stroke-linecap="round" />
+        <circle class="map-desire-end" cx="\${ex}" cy="\${ey}" r="3" fill="none" stroke="oklch(0.70 0.14 80)" stroke-width="1" stroke-dasharray="2 2" />
+        <text x="\${ex + (Math.cos(angle)>0?10:-10)}" y="\${ey+3}" text-anchor="\${Math.cos(angle)>0?'start':'end'}" class="map-pin-label" style="fill:oklch(0.70 0.14 80);font-style:italic">⌁ \${labelShort}</text>
+      </g>
     \`;
   });
 
   // ── Paved trails (paths from origin to each artifact pin) ──
   let trails = '';
-  positions.forEach(({x,y,a})=>{
+  positions.forEach(({x,y,a},idx)=>{
     const uses = a.uses||0;
     const ghost = a._ghost;
     const path = trail(cx, cy, x, y, ghost?1.2:0.9);
@@ -710,26 +778,24 @@ function buildMap(){
     } else if(ghost==='stale'){
       stroke = 'oklch(0.55 0.08 80)'; width = 1.6; opacity = 0.55; dash = 'stroke-dasharray="4 4"';
     } else if(a.working){
-      // well-walked → wide, warm, solid (a real beaten path)
       const intensity = Math.min(1, uses/15);
       stroke = \`oklch(\${0.62 + intensity*0.10} \${0.10 + intensity*0.04} 75)\`;
       width = 3.5 + intensity*4;
       opacity = 0.85;
     } else {
-      // paved but not walked yet → thin, pale
       stroke = 'oklch(0.55 0.04 90)'; width = 1.8; opacity = 0.55;
     }
 
     // Halo for the most-walked path
     if(a.working && uses >= 5){
-      trails += \`<path d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
+      trails += \`<path class="map-trail-glow" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
     }
-    trails += \`<path d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
+    trails += \`<path class="map-trail" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
   });
 
   // ── Pins for artifacts ──
   let pins = '';
-  positions.forEach(({x,y,a,angle})=>{
+  positions.forEach(({x,y,a,angle},idx)=>{
     const color = TYPE_COLORS[a.type] || TYPE_COLORS.command;
     const uses = a.uses||0;
     const ghost = a._ghost;
@@ -743,35 +809,45 @@ function buildMap(){
 
     const nameShort = a.name.length>22 ? a.name.slice(0,20)+'…' : a.name;
     const nameStyle = ghost==='dead' ? \`text-decoration:line-through;fill:oklch(0.50 0.03 80)\` : '';
+    const status = ghost || (a.working ? 'walked' : 'paved');
 
+    const tipPayload = encodeURIComponent(JSON.stringify({
+      kind:'pin', name:a.name, type:a.type, status, uses,
+      last_used:a.last_used||null, age:a.age||0, scope:a.scope||''
+    }));
+
+    let pinInner = '';
     // Outer glow for working artifacts
     if(a.working){
-      pins += \`<circle cx="\${x}" cy="\${y}" r="\${r+5}" fill="\${color}" opacity="0.18" />\`;
+      pinInner += \`<circle class="map-pin-glow" cx="\${x}" cy="\${y}" r="\${r+5}" fill="\${color}" opacity="0.18" />\`;
+    } else {
+      pinInner += \`<circle class="map-pin-glow" cx="\${x}" cy="\${y}" r="\${r+3}" fill="\${color}" opacity="0" />\`;
     }
     // Pin body
-    pins += \`<circle cx="\${x}" cy="\${y}" r="\${r}" fill="\${ghost?'none':color}" stroke="\${color}" stroke-width="\${ghost?1.4:1}" opacity="\${ghost==='dead'?0.5:1}" \${ghost==='dead'?'stroke-dasharray="2 2"':''} />\`;
+    pinInner += \`<circle class="map-pin-body" cx="\${x}" cy="\${y}" r="\${r}" fill="\${ghost?'none':color}" stroke="\${color}" stroke-width="\${ghost?1.4:1}" opacity="\${ghost==='dead'?0.5:1}" \${ghost==='dead'?'stroke-dasharray="2 2"':''} />\`;
     // Inner mark
-    if(!ghost) pins += \`<circle cx="\${x}" cy="\${y}" r="\${Math.max(1.5,r*0.35)}" fill="oklch(0.13 0.02 90)" />\`;
-
+    if(!ghost) pinInner += \`<circle cx="\${x}" cy="\${y}" r="\${Math.max(1.5,r*0.35)}" fill="oklch(0.13 0.02 90)" />\`;
     // Label
-    pins += \`<text x="\${lx}" y="\${ly+3}" text-anchor="\${anchor}" class="map-pin-label" style="\${nameStyle}">\${nameShort}</text>\`;
-    // Use count for working items
+    pinInner += \`<text x="\${lx}" y="\${ly+3}" text-anchor="\${anchor}" class="map-pin-label" style="\${nameStyle}">\${nameShort}</text>\`;
+    // Sub label
     if(a.working && uses>0){
-      pins += \`<text x="\${lx}" y="\${ly+15}" text-anchor="\${anchor}" class="map-pin-uses">\${uses}×</text>\`;
+      pinInner += \`<text x="\${lx}" y="\${ly+15}" text-anchor="\${anchor}" class="map-pin-uses">\${uses}×</text>\`;
     } else if(ghost==='dead'){
-      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.55 0.10 30);font-style:italic">overgrown</text>\`;
+      pinInner += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.55 0.10 30);font-style:italic">overgrown</text>\`;
     } else if(ghost==='stale'){
-      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.65 0.08 80);font-style:italic">stale · \${a.age||0}d</text>\`;
+      pinInner += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:oklch(0.65 0.08 80);font-style:italic">stale · \${a.age||0}d</text>\`;
     } else if(!a.working){
-      pins += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:var(--muted);font-style:italic">freshly paved</text>\`;
+      pinInner += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:var(--muted);font-style:italic">freshly paved</text>\`;
     }
+
+    pins += \`<g class="map-pin" data-id="art-\${idx}" data-tip="\${tipPayload}" style="--i:\${idx};--ox:\${x}px;--oy:\${y}px">\${pinInner}</g>\`;
   });
 
   // ── Origin marker (you / sessions) ──
   const totalSess = D.totalSessions;
   const origin = \`
-    <circle cx="\${cx}" cy="\${cy}" r="38" fill="none" stroke="oklch(0.70 0.14 75/.25)" stroke-width="1" />
-    <circle cx="\${cx}" cy="\${cy}" r="22" fill="none" stroke="oklch(0.70 0.14 75/.45)" stroke-width="1" />
+    <circle class="map-origin-ring-1" cx="\${cx}" cy="\${cy}" r="38" fill="none" stroke="oklch(0.70 0.14 75/.25)" stroke-width="1" />
+    <circle class="map-origin-ring-2" cx="\${cx}" cy="\${cy}" r="22" fill="none" stroke="oklch(0.70 0.14 75/.45)" stroke-width="1" />
     <circle cx="\${cx}" cy="\${cy}" r="10" fill="oklch(0.70 0.14 75)" />
     <circle cx="\${cx}" cy="\${cy}" r="4" fill="oklch(0.13 0.02 90)" />
     <text x="\${cx}" y="\${cy+58}" text-anchor="middle" class="map-origin-label">you · \${totalSess} sessions</text>
@@ -789,19 +865,20 @@ function buildMap(){
         <div class="map-cap-title">An aerial view of how you actually work.</div>
         <div class="map-cap-sub">\${allArtifacts.length} artifacts · \${desireCount} desire lines</div>
       </div>
-      <div style="position:relative">
+      <div style="position:relative" id="map-stage">
         <svg class="map-svg" viewBox="0 0 \${W} \${H}" preserveAspectRatio="xMidYMid meet">
           <g opacity="0.6">\${topo}</g>
           <g>\${grass}</g>
-          <g>\${desire}</g>
-          <g>\${trails}</g>
-          <g>\${origin}</g>
-          <g>\${pins}</g>
+          <g class="map-desire-layer">\${desire}</g>
+          <g class="map-trail-layer">\${trails}</g>
+          <g class="map-origin-layer">\${origin}</g>
+          <g class="map-pin-layer">\${pins}</g>
         </svg>
         <div class="map-grain"></div>
         <div class="map-vignette"></div>
         <div class="map-compass">N</div>
         <div class="map-meta">scale · <b>\${totalSess} sess</b> · \${D.pipeline.acceptRate}% acc</div>
+        <div class="map-tip" id="map-tip"></div>
         <div class="map-legend">
           <div class="map-legend-title">Legend</div>
           <div class="map-legend-row"><span class="map-legend-swatch" style="background:oklch(0.72 0.14 75);height:4px"></span> walked path</div>
@@ -837,6 +914,84 @@ function buildMap(){
       </div>
     </div>
   \`;
+
+  // ── Hover wiring: highlight pin↔trail pair, show tooltip ──
+  const stage = document.getElementById('map-stage');
+  const tip = document.getElementById('map-tip');
+  if(!stage || !tip) return;
+
+  const fmtTip = (data)=>{
+    if(data.kind==='desire'){
+      return \`
+        <div class="map-tip-head"><span class="map-tip-glyph">⌁</span> desire line</div>
+        <div class="map-tip-name">\${data.name}</div>
+        <div class="map-tip-row"><span>type</span><b>\${data.type}</b></div>
+        <div class="map-tip-row"><span>frequency</span><b>\${data.frequency}× sessions</b></div>
+        \${data.trigger?\`<div class="map-tip-row"><span>trigger</span><b><code>\${data.trigger}</code></b></div>\`:''}
+        <div class="map-tip-foot">not yet paved · candidate for an artifact</div>
+      \`;
+    }
+    const statusLbl = data.status==='dead'?'overgrown · never walked'
+                    : data.status==='stale'?\`stale · \${data.age}d quiet\`
+                    : data.status==='walked'?'walked path · in active use'
+                    : 'freshly paved · not walked yet';
+    return \`
+      <div class="map-tip-head"><span class="map-tip-dot" style="background:\${TYPE_COLORS[data.type]||'#999'}"></span> \${data.type}</div>
+      <div class="map-tip-name">\${data.name}</div>
+      <div class="map-tip-row"><span>uses</span><b>\${data.uses}× sessions</b></div>
+      \${data.scope?\`<div class="map-tip-row"><span>scope</span><b>\${data.scope}</b></div>\`:''}
+      \${data.last_used?\`<div class="map-tip-row"><span>last used</span><b>\${data.last_used}</b></div>\`:''}
+      <div class="map-tip-foot">\${statusLbl}</div>
+    \`;
+  };
+
+  const svg = stage.querySelector('.map-svg');
+  const setLink = (id, on)=>{
+    stage.querySelectorAll(\`[data-id="\${id}"]\`).forEach(el=>{
+      el.classList.toggle('is-hover', on);
+    });
+    if(svg) svg.classList.toggle('has-hover', on);
+  };
+
+  const onEnter = (e)=>{
+    const el = e.target.closest('[data-tip]');
+    if(!el) return;
+    const id = el.getAttribute('data-id');
+    if(id) setLink(id, true);
+    try {
+      const data = JSON.parse(decodeURIComponent(el.getAttribute('data-tip')));
+      tip.innerHTML = fmtTip(data);
+      tip.classList.add('show');
+    } catch(_){}
+  };
+  const onMove = (e)=>{
+    if(!tip.classList.contains('show')) return;
+    const r = stage.getBoundingClientRect();
+    let x = e.clientX - r.left + 14;
+    let y = e.clientY - r.top + 14;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    if(x + tw > r.width - 8) x = e.clientX - r.left - tw - 14;
+    if(y + th > r.height - 8) y = e.clientY - r.top - th - 14;
+    tip.style.transform = \`translate(\${x}px, \${y}px)\`;
+  };
+  const onLeave = (e)=>{
+    const el = e.target.closest('[data-tip]');
+    if(!el) return;
+    const id = el.getAttribute('data-id');
+    if(id) setLink(id, false);
+    tip.classList.remove('show');
+  };
+
+  stage.querySelectorAll('[data-tip]').forEach(el=>{
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+  });
+  stage.addEventListener('mousemove', onMove);
+
+  // Trigger entrance animation on next frame
+  requestAnimationFrame(()=>{
+    if(svg) svg.classList.add('play');
+  });
 }
 
 function buildSignals(){
