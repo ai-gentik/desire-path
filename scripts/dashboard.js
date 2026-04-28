@@ -335,8 +335,8 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .p-freq{text-align:right;font-family:'Fraunces',serif}
 .p-freq-n{font-size:32px;font-weight:300;color:var(--signal);line-height:1}
 .p-freq-x{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono'}
-.pattern-acted{border-color:var(--good)!important;background:oklch(0.72 0.10 145 / .05)!important}
-.p-acted{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--good);border:1px solid var(--good);padding:2px 7px}
+.pattern-acted{opacity:.55}
+.p-acted{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 
 .log{border:1px solid var(--line);background:var(--panel)}
 .log-row{display:grid;grid-template-columns:80px 14px 1fr 80px 80px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);align-items:center}
