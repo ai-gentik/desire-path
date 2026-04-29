@@ -338,6 +338,12 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .pattern-acted{opacity:.55}
 .p-acted{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 .p-acted.is-paved{color:var(--good);opacity:1}
+.pat-show-btn{font-size:10px;letter-spacing:.04em;color:var(--muted);cursor:pointer;user-select:none;padding:2px 8px;border:1px solid var(--line)}
+.pat-show-btn:hover{color:var(--fg);border-color:var(--muted)}
+.pat-show-btn.active{color:var(--fg);border-color:var(--muted)}
+#pat-list:not([data-show-all]) [data-resolved]{display:none}
+#sug-list[data-filter="accepted"] .log-row:not([data-outcome="accepted"]){display:none}
+#sug-list[data-filter="dismissed"] .log-row:not([data-outcome="dismissed"]){display:none}
 
 .log{border:1px solid var(--line);background:var(--panel)}
 .log-row{display:grid;grid-template-columns:80px 14px 1fr 80px 80px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);align-items:center}
@@ -1156,7 +1162,8 @@ function buildPatterns(){
     const acted = acceptedDescs.has(desc) || acceptedTypes.has(p.type);
     const dismissed = dismissedDescs.has(desc) || dismissedTypes.has(p.type);
     return \`
-    <div class="pattern\${acted?' pattern-acted':''}">
+    <div class="pattern\${acted?' pattern-acted':''}" \${acted?'data-resolved':''}>
+
       <div class="p-rank">\${String(i+1).padStart(2,"0")}</div>
       <div>
         <div class="p-quote">\${desc}</div>
@@ -1178,7 +1185,7 @@ function buildPatterns(){
   }).join("") : '<div class="empty">Patterns emerge after 5+ sessions.</div>';
 
   const sugs = D.suggestions.length ? D.suggestions.slice().reverse().map(s=>\`
-    <div class="log-row">
+    <div class="log-row" data-outcome="\${s.outcome}">
       <span class="log-time">\${(s.at||s.date||'').slice(0,10)}</span>
       <span class="log-dot" style="background:\${typeCol(s.pattern?.type||s.type)}"></span>
       <span class="log-msg">\${s.pattern?.description||s.pattern?.hint||s.desc||''}</span>
@@ -1186,18 +1193,50 @@ function buildPatterns(){
       <span class="log-out \${s.outcome}">\${s.outcome}</span>
     </div>\`).join("") : '<div class="empty">No suggestions made yet.</div>';
 
+  const resolvedCount = D.patterns.filter(p => {
+    const desc = p.description||p.desc||'';
+    return acceptedDescs.has(desc) || acceptedTypes.has(p.type);
+  }).length;
+  const activeCount = D.patterns.length - resolvedCount;
+
   document.getElementById("tab-patterns").innerHTML = \`
     <div class="panel-head" style="border:1px solid var(--line);background:var(--panel);padding:14px 20px;margin-bottom:8px">
       <div class="panel-title">Detected Patterns · ranked by frequency</div>
-      <div class="panel-meta">\${D.patterns.filter(p=>!acceptedTypes.has(p.type)).length} unpaved · \${D.patterns.length} total · re-scanned every 5 sessions</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="panel-meta">\${activeCount} active · \${D.patterns.length} total · re-scanned every 5 sessions</div>
+        \${resolvedCount>0?'<span class="pat-show-btn" id="pat-toggle">show resolved ('+resolvedCount+')</span>':''}
+      </div>
     </div>
-    \${pats}
+    <div id="pat-list">\${pats}</div>
     <div class="panel-head" style="border:1px solid var(--line);background:var(--panel);padding:14px 20px;margin:24px 0 8px">
       <div class="panel-title">Suggestion Log · most recent first</div>
-      <div class="panel-meta">\${D.suggestions.length} entries · \${D.pipeline.acceptRate}% acceptance</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="panel-meta">\${D.suggestions.length} entries · \${D.pipeline.acceptRate}% acceptance</div>
+        <span class="pat-show-btn active" id="sug-all">all</span>
+        <span class="pat-show-btn" id="sug-accepted">accepted</span>
+        <span class="pat-show-btn" id="sug-dismissed">dismissed</span>
+      </div>
     </div>
-    <div class="log">\${sugs}</div>
+    <div class="log" id="sug-list">\${sugs}</div>
   \`;
+  const tBtn = document.getElementById('pat-toggle');
+  if(tBtn) tBtn.onclick = () => {
+    const l = document.getElementById('pat-list');
+    const on = l.hasAttribute('data-show-all');
+    on ? l.removeAttribute('data-show-all') : l.setAttribute('data-show-all','');
+    tBtn.textContent = on ? 'show resolved ('+resolvedCount+')' : 'hide resolved';
+  };
+  ['all','accepted','dismissed'].forEach(f => {
+    const btn = document.getElementById('sug-'+f);
+    if(!btn) return;
+    btn.onclick = () => {
+      const l = document.getElementById('sug-list');
+      l.dataset.filter = f === 'all' ? '' : f;
+      ['all','accepted','dismissed'].forEach(x => {
+        document.getElementById('sug-'+x)?.classList.toggle('active', x===f);
+      });
+    };
+  });
 }
 
 function buildInventory(){
