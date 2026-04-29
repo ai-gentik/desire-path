@@ -654,7 +654,7 @@ function buildOverview(){
 
   const agentBars = D.agents.length ? D.agents.map(([n,v])=>\`
     <div class="bar-row">
-      <span class="bar-name" title="\${n}">\${n}</span>
+      \${splitName(n)}
       <div class="bar-track">\${barFill(v,maxAgent)}</div>
       <span class="bar-val">\${v}</span>
     </div>\`).join("") : '<div class="empty">No agent dispatches yet.</div>';
@@ -1153,14 +1153,12 @@ function buildSignals(){
 
 function buildPatterns(){
   const maxFreq = Math.max(...D.patterns.map(p=>p.frequency||p.freq||1),1);
-  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted'||s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
-  const acceptedTypes = new Set(D.suggestions.filter(s=>s.outcome==='accepted'||s.outcome==='dismissed').map(s=>s.pattern?.type).filter(Boolean));
+  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.description||s.desc||''));
   const dismissedDescs = new Set(D.suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
-  const dismissedTypes = new Set(D.suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.type).filter(Boolean));
   const pats = D.patterns.length ? D.patterns.map((p,i)=>{
     const desc = p.description||p.desc||'';
-    const acted = acceptedDescs.has(desc) || acceptedTypes.has(p.type);
-    const dismissed = dismissedDescs.has(desc) || dismissedTypes.has(p.type);
+    const acted = acceptedDescs.has(desc);
+    const dismissed = dismissedDescs.has(desc);
     return \`
     <div class="pattern\${acted?' pattern-acted':''}" \${acted?'data-resolved':''}>
 
@@ -1195,7 +1193,7 @@ function buildPatterns(){
 
   const resolvedCount = D.patterns.filter(p => {
     const desc = p.description||p.desc||'';
-    return acceptedDescs.has(desc) || acceptedTypes.has(p.type);
+    return acceptedDescs.has(desc);
   }).length;
   const activeCount = D.patterns.length - resolvedCount;
 
