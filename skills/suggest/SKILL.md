@@ -26,15 +26,33 @@ Otherwise use `$ARGUMENTS` as the description of the workflow to pave.
 
 | Pattern type | Best artifact | Why |
 |---|---|---|
-| Repeated prompt structure | `~/.claude/skills/<slug>/SKILL.md` | Invoke with `/slug` or auto-triggered |
-| Always-on context (every session) | Append to `~/.claude/CLAUDE.md` | Loaded automatically, zero friction |
-| Post-tool automation | Hook in `~/.claude/settings.json` | Deterministic, no prompt needed |
-| Complex multi-step flow | `~/.claude/agents/<slug>.md` | Isolated context, own tool config |
+| Repeated prompt structure | skill | Invoke with `/slug` or auto-triggered |
+| Always-on context (every session) | CLAUDE.md addition | Loaded automatically, zero friction |
+| Post-tool automation | hook | Deterministic, no prompt needed |
+| Complex multi-step flow | agent | Isolated context, own tool config |
+
+## Step 2.5 — Determine scope
+
+Check `pattern.scope`:
+
+- **`"project"`**: The pattern was detected mostly in one project (`pattern.project_cwd`). Default to **project-scoped** artifact — ask: *"This pattern seems specific to `<project_name>`. Add it just for that project, or globally for all projects?"*
+- **`"global"`** or no scope: Default to **global** artifact.
+- **No `cwd` data**: Ask: *"Should this apply to all your projects (global) or just the current one (`<basename of cwd>`)?"*
+
+The answer determines where artifacts are written (see Step 3).
 
 ## Step 3 — Write the artifact
 
-### For a CLAUDE.md addition:
-Read the current `~/.claude/CLAUDE.md`. Add a concise section at the bottom:
+### For a global CLAUDE.md addition:
+Read `~/.claude/CLAUDE.md`. Add a concise section at the bottom:
+```markdown
+## [Pattern name]
+[1-3 lines of always-on instruction derived from the pattern]
+```
+Write the file. Don't duplicate existing content.
+
+### For a project CLAUDE.md addition:
+Read `<project_cwd>/.claude/CLAUDE.md` (create if missing). Add a concise section at the bottom:
 ```markdown
 ## [Pattern name]
 [1-3 lines of always-on instruction derived from the pattern]
@@ -42,6 +60,7 @@ Read the current `~/.claude/CLAUDE.md`. Add a concise section at the bottom:
 Write the file. Don't duplicate existing content.
 
 ### For a skill:
+Skills are always global (invoked by name across all projects).
 Create `~/.claude/skills/<slug>/SKILL.md`:
 ```markdown
 ---
@@ -53,8 +72,21 @@ description: >
 <Instructions derived from the repeated prompts>
 ```
 
-### For a hook:
+### For a global hook:
 Read `~/.claude/settings.json`. Merge in the new hook, preserve all existing ones:
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "<ToolName>",
+      "hooks": [{ "type": "command", "command": "<cmd>", "async": true }]
+    }]
+  }
+}
+```
+
+### For a project hook:
+Read `<project_cwd>/.claude/settings.json` (create if missing). Merge in the new hook:
 ```json
 {
   "hooks": {
@@ -86,10 +118,12 @@ Append to `~/.claude/desire-path/paved.jsonl`:
 {"timestamp":"<iso>","type":"<claude_md|skill|hook|agent>","name":"<slug>","trigger":"<what>"}
 ```
 
-Tell the user what was created and how it activates:
-- CLAUDE.md: "Added — active from your next session."
-- Skill: "Use `/slug` or auto-triggers when you ask about [x]."
-- Hook: "Fires automatically after every [ToolName] call."
+Tell the user what was created, where it lives, and how it activates:
+- Global CLAUDE.md: "Added to `~/.claude/CLAUDE.md` — active in all projects from your next session."
+- Project CLAUDE.md: "Added to `<project>/.claude/CLAUDE.md` — active only in that project from your next session."
+- Skill: "Use `/slug` or auto-triggers when you ask about [x]. Available in all projects."
+- Global hook: "Added to `~/.claude/settings.json` — fires automatically in all projects after every [ToolName] call."
+- Project hook: "Added to `<project>/.claude/settings.json` — fires only in that project after every [ToolName] call."
 - Agent: "Spawned by Claude when [trigger]."
 
 ## Step 5 — Log the suggestion outcome

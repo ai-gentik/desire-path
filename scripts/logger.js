@@ -14,6 +14,7 @@ const os   = require('os');
 const path = require('path');
 
 const DIR          = path.join(os.homedir(), '.claude', 'desire-path');
+const CWD          = process.env.CLAUDE_PROJECT_DIR || '';
 const SESSIONS     = path.join(DIR, 'sessions.jsonl');
 const USAGE        = path.join(DIR, 'usage.jsonl');
 const USAGE_TOTALS = path.join(DIR, 'usage-totals.json');  // compacted aggregates
@@ -298,6 +299,7 @@ try {
 
     fs.appendFileSync(SESSIONS, JSON.stringify({
       sid, at: now, started: state.started_at,
+      cwd: CWD,
       tools: state.tools, skills: state.skills,
       commands: state.commands, agents: state.agents,
       prompts: state.prompts, turns: state.turns,

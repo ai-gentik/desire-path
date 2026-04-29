@@ -23,6 +23,16 @@ Cross-reference with `~/.claude/desire-path/paved.jsonl`.
 Scan `~/.claude/settings.json` for existing hooks.
 List `~/.claude/skills/` and `~/.claude/agents/`.
 
+## Scope detection
+
+Each session may have a `cwd` field (project directory). Use it to determine whether each pattern is global or project-specific:
+
+- **Project-scoped**: if ≥70% of the sessions exhibiting a pattern share the same `cwd`, label it `scope: "project"` and set `project_cwd` to that path.
+- **Global**: pattern appears across multiple different projects → `scope: "global"`.
+- **Unknown**: no `cwd` data in sessions → omit `scope` field.
+
+Include this in each `top_paths` entry.
+
 ## What to look for
 
 **Desire paths** (high value):
@@ -53,6 +63,8 @@ Save to `~/.claude/desire-path/latest-analysis.json`:
       "description": "Specific plain-English description",
       "evidence": ["exact prompt fragment", "..."],
       "frequency": <n>,
+      "scope": "global|project",
+      "project_cwd": "/path/to/project (only when scope is project)",
       "suggested_artifact": {
         "type": "skill|hook|agent",
         "name": "slug",
