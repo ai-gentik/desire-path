@@ -8,7 +8,7 @@ description: >
 model: sonnet
 effort: high
 maxTurns: 15
-disallowedTools: Write, Edit
+disallowedTools: []
 memory: user
 ---
 
