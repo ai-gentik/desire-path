@@ -14,11 +14,10 @@ Arguments: `$ARGUMENTS`
 ## Step 1 — Load the pattern
 
 If `$ARGUMENTS` is empty or "latest":
-1. Read `~/.claude/desire-path/suggestions.jsonl` and collect all `pattern.type` values where `outcome === "accepted"` → call this `acceptedTypes`.
-2. Read `~/.claude/desire-path/latest-analysis.json`. Find the highest-ranked entry in `top_paths` whose `type` is **not** in `acceptedTypes`. If found, use that as the pattern.
-3. If no unpaved pattern found in `top_paths`, fall back to `~/.claude/desire-path/last-suggestion.json`.
+1. Read `~/.claude/desire-path/latest-analysis.json`. Find the highest-ranked entry in `top_paths` where `_resolved` is **not** `true`. That is the pattern to pave next.
+2. If no unresolved pattern found in `top_paths`, fall back to `~/.claude/desire-path/last-suggestion.json`.
 
-Tell the user which pattern you're paving and how many unpaved ones remain (e.g. "Paving pattern 2 of 5 unpaved — X more after this.").
+Tell the user which pattern you're paving and how many unresolved ones remain (e.g. "Paving pattern 2 of 5 — X more after this.").
 
 Otherwise use `$ARGUMENTS` as the description of the workflow to pave.
 
@@ -135,9 +134,15 @@ Tell the user what was created, where it lives, and how it activates:
 
 ## Step 5 — Log the suggestion outcome
 
-After writing the artifact, also append to `~/.claude/desire-path/suggestions.jsonl`:
+After writing the artifact:
+
+1. Mark the pattern as resolved in `~/.claude/desire-path/latest-analysis.json` by setting `"_resolved": true` on the matching entry in `top_paths` (match by rank). Write the updated file back.
+
+2. Append to `~/.claude/desire-path/suggestions.jsonl`:
 ```json
 {"at":"<iso>","sid":"<session>","pattern":<pattern_object>,"outcome":"accepted","artifact_created":"<slug>"}
 ```
+
+Marking `_resolved` directly in `latest-analysis.json` is the source of truth — it survives description changes and rank changes between analysis runs. When the next deep analysis runs it generates a fresh file, so stale resolved state is automatically cleared.
 
 This closes the feedback loop: the dashboard can show what was suggested, what got accepted, and whether the created artifact is actually being used.

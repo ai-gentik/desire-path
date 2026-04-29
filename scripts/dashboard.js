@@ -129,20 +129,32 @@ const pavedEnriched = paved.map(p=>({
   working: (usageByArtifact[p.name]?.total_uses||0)>=2
 }));
 
-const detectedPaths = analysis?.top_paths||[];
+const acceptedSugsServer = suggestions.filter(s=>s.outcome==='accepted');
+const acceptedDescsServer = new Set(acceptedSugsServer.map(s=>s.pattern?.description||s.desc||''));
+const dismissedDescsServer = new Set(suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
+
+// Resolution source of truth: _resolved flag written directly into latest-analysis.json by suggest skill.
+// Description match kept as backward-compat fallback for suggestions logged before this fix.
+const detectedPaths = (analysis?.top_paths||[]).map(p => {
+  const desc = p.description||p.desc||'';
+  return {
+    ...p,
+    _resolved: p._resolved === true || acceptedDescsServer.has(desc),
+    _dismissed: p._dismissed === true || dismissedDescsServer.has(desc)
+  };
+});
+
 const totalSuggestions = suggestions.length;
-const accepted = suggestions.filter(s=>s.outcome==='accepted').length;
+const accepted = acceptedSugsServer.length;
 const acceptRate = totalSuggestions>0?Math.round(accepted/totalSuggestions*100):0;
 const workingPaths = pavedEnriched.filter(p=>p.working).length;
 
 const allSuggestions = [...suggestions];
 if(lastSuggest?.pattern){
   const desc = lastSuggest.pattern.description;
-  const type = lastSuggest.pattern.type;
-  // Don't add as pending if already logged by description OR if this type was already accepted
   const alreadyLogged = suggestions.find(s=>s.pattern?.description===desc);
-  const typeAccepted = suggestions.some(s=>s.outcome==='accepted' && s.pattern?.type===type);
-  if(!alreadyLogged && !typeAccepted) allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
+  const descAccepted = acceptedDescsServer.has(desc);
+  if(!alreadyLogged && !descAccepted) allSuggestions.push({at:lastSuggest.at,pattern:lastSuggest.pattern,outcome:'pending'});
 }
 const dedupedSuggestions = allSuggestions;
 
@@ -752,11 +764,8 @@ function buildMap(){
   const allArtifacts = [...paved, ...extraDead, ...sessionSkills, ...sessionCmds, ...sessionAgents];
 
   // Detected-but-not-paved patterns become dashed "desire lines"
-  const acceptedTypeSet = new Set(
-    (D.suggestions||[]).filter(s=>s.outcome==='accepted').map(s=>s.pattern?.type).filter(Boolean)
-  );
   let desireLines = (D.patterns||[]).filter(p=>{
-    if (acceptedTypeSet.has(p.type)) return false;
+    if (p._resolved) return false;
     const n = p.suggested_artifact?.name || p.name;
     return !n || !allArtifacts.find(a=>a.name===n);
   }).slice(0,5);
@@ -1153,12 +1162,10 @@ function buildSignals(){
 
 function buildPatterns(){
   const maxFreq = Math.max(...D.patterns.map(p=>p.frequency||p.freq||1),1);
-  const acceptedDescs = new Set(D.suggestions.filter(s=>s.outcome==='accepted').map(s=>s.pattern?.description||s.desc||''));
-  const dismissedDescs = new Set(D.suggestions.filter(s=>s.outcome==='dismissed').map(s=>s.pattern?.description||s.desc||''));
   const pats = D.patterns.length ? D.patterns.map((p,i)=>{
     const desc = p.description||p.desc||'';
-    const acted = acceptedDescs.has(desc);
-    const dismissed = dismissedDescs.has(desc);
+    const acted = !!p._resolved;
+    const dismissed = !!p._dismissed;
     return \`
     <div class="pattern\${acted?' pattern-acted':''}" \${acted?'data-resolved':''}>
 
@@ -1191,10 +1198,7 @@ function buildPatterns(){
       <span class="log-out \${s.outcome}">\${s.outcome}</span>
     </div>\`).join("") : '<div class="empty">No suggestions made yet.</div>';
 
-  const resolvedCount = D.patterns.filter(p => {
-    const desc = p.description||p.desc||'';
-    return acceptedDescs.has(desc);
-  }).length;
+  const resolvedCount = D.patterns.filter(p=>p._resolved).length;
   const activeCount = D.patterns.length - resolvedCount;
 
   document.getElementById("tab-patterns").innerHTML = \`
