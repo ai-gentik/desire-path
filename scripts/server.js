@@ -23,7 +23,20 @@ function isPortBound(port) {
 async function main() {
   const bound = await isPortBound(PORT);
   if (bound) {
-    process.exit(0); // already running, silent exit
+    // Kill the old server (may be a stale version) and wait for port to free
+    try {
+      const oldPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+      if (oldPid && !isNaN(oldPid)) {
+        process.kill(oldPid, 'SIGTERM');
+        await new Promise(r => setTimeout(r, 500));
+        const stillBound = await isPortBound(PORT);
+        if (stillBound) { process.exit(0); } // couldn't free port, give up
+      } else {
+        process.exit(0); // no pid file, can't kill, give up
+      }
+    } catch {
+      process.exit(0);
+    }
   }
 
   const { renderDashboard } = require('./dashboard.js');
