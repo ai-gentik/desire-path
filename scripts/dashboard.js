@@ -337,6 +337,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .p-freq-x{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono'}
 .pattern-acted{opacity:.55}
 .p-acted{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.p-acted.is-paved{color:var(--good);opacity:1}
 
 .log{border:1px solid var(--line);background:var(--panel)}
 .log-row{display:grid;grid-template-columns:80px 14px 1fr 80px 80px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);align-items:center}
@@ -676,7 +677,7 @@ function buildOverview(){
       <td class="r"><span class="trend">\${trendCells(p.uses)}</span></td>
       <td class="r"><span class="t-num \${p.uses?'':'zero'}">\${p.uses}</span></td>
       <td class="r"><span class="t-when">\${fmt(p.last_used)}</span></td>
-      <td class="r"><span class="t-status \${p.working?'working':'growing'}">\${p.working?'walked':'overgrown'}</span></td>
+      <td class="r"><span class="t-status \${p.working?'working':p.uses>0?'growing':'stale'}">\${p.working?'walked':p.uses>0?'growing':'paved'}</span></td>
     </tr>\`).join("") : '<tr><td colspan="6"><div class="empty">Nothing paved yet — say yes to a suggestion.</div></td></tr>';
 
   document.getElementById("tab-overview").innerHTML = \`
@@ -1162,7 +1163,7 @@ function buildPatterns(){
         <div class="p-meta">
           <span class="t-type" style="color:\${typeCol(p.type)}">\${p.type||'pattern'}</span>
           <span class="p-trigger">trigger · <b>\${p.suggested_artifact?.trigger||p.tag||'—'}</b></span>
-          \${dismissed?'<span class="p-acted" style="opacity:.5">dismissed</span>':acted?'<span class="p-acted">paved</span>':''}
+          \${dismissed?'<span class="p-acted" style="opacity:.5">dismissed</span>':acted?'<span class="p-acted is-paved">paved ✓</span>':''}
         </div>
       </div>
       <div class="p-strength">
