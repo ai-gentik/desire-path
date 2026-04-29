@@ -421,9 +421,16 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 
 .map-compass{position:absolute;left:18px;top:18px;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:oklch(0.12 0.02 90/.85);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:14px;color:var(--muted);font-style:italic;backdrop-filter:blur(4px)}
 
-.map-cap{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
-.map-cap-title{font-family:'Fraunces',serif;font-size:18px;font-weight:400;font-style:italic;color:var(--ink);letter-spacing:-.005em}
+.map-cap{padding:16px 20px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.map-cap-title{font-family:'Fraunces',serif;font-size:22px;font-weight:400;color:var(--ink);letter-spacing:-.01em;line-height:1}
+.map-cap-title em{font-style:italic;color:var(--signal)}
+.map-cap-subtitle{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:oklch(0.55 0.03 80);margin-left:10px;font-family:'JetBrains Mono',monospace}
 .map-cap-sub{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.map-filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.map-filter-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;transition:all .15s ease;border-radius:2px}
+.map-filter-btn:hover{border-color:var(--signal);color:var(--ink)}
+.map-filter-btn.active{background:oklch(0.20 0.04 80);border-color:var(--signal);color:var(--signal)}
+.map-filter-sep{width:1px;height:14px;background:var(--line);margin:0 3px}
 
 .map-pin-label{font-family:'JetBrains Mono',monospace;font-size:9px;fill:var(--ink-2);letter-spacing:.04em;paint-order:stroke;stroke:oklch(0.12 0.02 90/.9);stroke-width:3px;stroke-linejoin:round}
 .map-pin-uses{font-family:'Fraunces',serif;font-size:11px;fill:var(--signal);font-style:italic;paint-order:stroke;stroke:oklch(0.12 0.02 90/.95);stroke-width:3px}
@@ -500,6 +507,16 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .map-svg.play .map-trail-glow{animation-delay:calc(var(--i,0) * 80ms + 50ms)}
 .map-svg.play .map-pin{animation-delay:calc(var(--i,0) * 80ms + 600ms)}
 .map-svg.play .map-desire{animation-delay:calc(1.4s + var(--i,0) * 100ms)}
+
+/* Map filter visibility */
+.map-svg.hide-walked .map-trail[data-status="walked"],.map-svg.hide-walked .map-trail-glow[data-status="walked"],.map-svg.hide-walked .map-pin[data-status="walked"]{display:none}
+.map-svg.hide-paved .map-trail[data-status="paved"],.map-svg.hide-paved .map-pin[data-status="paved"]{display:none}
+.map-svg.hide-stale .map-trail[data-status="stale"],.map-svg.hide-stale .map-pin[data-status="stale"],.map-svg.hide-stale .map-trail[data-status="dead"],.map-svg.hide-stale .map-pin[data-status="dead"]{display:none}
+.map-wrap.hide-desire .map-desire-layer{display:none}
+.map-wrap.hide-calls .map-call-arc-layer{display:none}
+.map-svg.hide-skill .map-pin[data-type="skill"],.map-svg.hide-skill .map-trail[data-type="skill"],.map-svg.hide-skill .map-trail-glow[data-type="skill"]{display:none}
+.map-svg.hide-hook .map-pin[data-type="hook"],.map-svg.hide-hook .map-trail[data-type="hook"],.map-svg.hide-hook .map-trail-glow[data-type="hook"]{display:none}
+.map-svg.hide-agent .map-pin[data-type="agent"],.map-svg.hide-agent .map-trail[data-type="agent"],.map-svg.hide-agent .map-trail-glow[data-type="agent"]{display:none}
 
 </style>
 </head>
@@ -877,11 +894,13 @@ function buildMap(){
       stroke = 'oklch(0.55 0.04 90)'; width = 1.8; opacity = 0.55;
     }
 
+    const trailStatus = ghost || (a.working ? 'walked' : 'paved');
+    const trailType = a.type||'';
     // Halo for the most-walked path
     if(a.working && uses >= 5){
-      trails += \`<path class="map-trail-glow" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
+      trails += \`<path class="map-trail-glow" data-id="art-\${idx}" data-status="\${trailStatus}" data-type="\${trailType}" style="--i:\${idx}" d="\${path}" fill="none" stroke="oklch(0.70 0.14 75/.18)" stroke-width="\${width+8}" stroke-linecap="round" />\`;
     }
-    trails += \`<path class="map-trail" data-id="art-\${idx}" style="--i:\${idx}" d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
+    trails += \`<path class="map-trail" data-id="art-\${idx}" data-status="\${trailStatus}" data-type="\${trailType}" style="--i:\${idx}" d="\${path}" fill="none" stroke="\${stroke}" stroke-width="\${width}" stroke-linecap="round" opacity="\${opacity}" \${dash} />\`;
   });
 
   // ── Cross-artifact call arcs (skill→agent, skill→skill) ──
@@ -953,7 +972,7 @@ function buildMap(){
       pinInner += \`<text x="\${lx}" y="\${ly+14}" text-anchor="\${anchor}" class="map-pin-label" style="fill:var(--muted);font-style:italic">freshly paved</text>\`;
     }
 
-    pins += \`<g class="map-pin" data-id="art-\${idx}" data-tip="\${tipPayload}" style="--i:\${idx};--ox:\${x}px;--oy:\${y}px">\${pinInner}</g>\`;
+    pins += \`<g class="map-pin" data-id="art-\${idx}" data-tip="\${tipPayload}" data-status="\${status}" data-type="\${a.type||''}" style="--i:\${idx};--ox:\${x}px;--oy:\${y}px">\${pinInner}</g>\`;
   });
 
   // ── Origin marker (you / sessions) ──
@@ -975,8 +994,22 @@ function buildMap(){
   document.getElementById("tab-map").innerHTML = \`
     <div class="map-wrap">
       <div class="map-cap">
-        <div class="map-cap-title">An aerial view of how you actually work.</div>
-        <div class="map-cap-sub">\${allArtifacts.length} artifacts · \${desireCount} desire lines</div>
+        <div style="display:flex;align-items:baseline;gap:0">
+          <div class="map-cap-title">Aerial <em>view</em></div>
+          <span class="map-cap-subtitle">// THE TERRAIN YOU'VE WORN</span>
+        </div>
+        <div class="map-filters" id="map-filters">
+          <button class="map-filter-btn active" data-filter="walked" title="Walked paths">walked</button>
+          <button class="map-filter-btn active" data-filter="paved" title="Freshly paved">paved</button>
+          <button class="map-filter-btn active" data-filter="stale" title="Stale & dead">stale</button>
+          <div class="map-filter-sep"></div>
+          <button class="map-filter-btn active" data-filter="desire" title="Desire lines">desire</button>
+          <button class="map-filter-btn active" data-filter="calls" title="Call arcs">calls</button>
+          <div class="map-filter-sep"></div>
+          <button class="map-filter-btn active" data-filter="skill" title="Skills">skill</button>
+          <button class="map-filter-btn active" data-filter="hook" title="Hooks">hook</button>
+          <button class="map-filter-btn active" data-filter="agent" title="Agents">agent</button>
+        </div>
       </div>
       <div style="position:relative" id="map-stage">
         <svg class="map-svg" viewBox="0 0 \${W} \${H}" preserveAspectRatio="xMidYMid meet">
@@ -1068,7 +1101,15 @@ function buildMap(){
   };
 
   const onEnter = (e)=>{
-    const el = e.target.closest('[data-tip]');
+    let el = e.target.closest('[data-tip]');
+    // Trails share data-id with their pin but have no data-tip — look it up
+    if(!el) {
+      const trail = e.target.closest('.map-trail');
+      if(trail) {
+        const id = trail.getAttribute('data-id');
+        el = id ? stage.querySelector(\`.map-pin[data-id="\${id}"]\`) : null;
+      }
+    }
     if(!el) return;
     const id = el.getAttribute('data-id');
     if(id) setLink(id, true);
@@ -1089,7 +1130,11 @@ function buildMap(){
     tip.style.transform = \`translate(\${x}px, \${y}px)\`;
   };
   const onLeave = (e)=>{
-    const el = e.target.closest('[data-tip]');
+    let el = e.target.closest('[data-tip]');
+    if(!el) {
+      const trail = e.target.closest('.map-trail');
+      if(trail) el = trail;
+    }
     if(!el) return;
     const id = el.getAttribute('data-id');
     if(id) setLink(id, false);
@@ -1100,7 +1145,27 @@ function buildMap(){
     el.addEventListener('mouseenter', onEnter);
     el.addEventListener('mouseleave', onLeave);
   });
+  stage.querySelectorAll('.map-trail').forEach(el=>{
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+  });
   stage.addEventListener('mousemove', onMove);
+
+  // Map filters
+  const wrap = document.getElementById('tab-map').querySelector('.map-wrap');
+  document.getElementById('map-filters').addEventListener('click', e=>{
+    const btn = e.target.closest('.map-filter-btn');
+    if(!btn) return;
+    const f = btn.dataset.filter;
+    const on = btn.classList.toggle('active');
+    if(f==='desire'){
+      wrap.classList.toggle('hide-desire', !on);
+    } else if(f==='calls'){
+      wrap.classList.toggle('hide-calls', !on);
+    } else if(svg) {
+      svg.classList.toggle('hide-'+f, !on);
+    }
+  });
 
   // Trigger entrance animation on next frame
   requestAnimationFrame(()=>{
