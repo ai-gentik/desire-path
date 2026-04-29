@@ -55,8 +55,12 @@ async function main() {
     }
   });
 
+  const VERSION_FILE = path.join(DIR, 'server-version.txt');
+  const selfVersion = __dirname.match(/desire-path\/(\d+\.\d+\.\d+)\//)?.[1] || 'dev';
+
   server.listen(PORT, '127.0.0.1', () => {
     fs.writeFileSync(PID_FILE, String(process.pid));
+    fs.writeFileSync(VERSION_FILE, selfVersion);
     process.stdout.write(`desire-path dashboard → http://localhost:${PORT}\n`);
   });
 

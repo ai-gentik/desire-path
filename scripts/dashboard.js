@@ -188,6 +188,7 @@ const DATA = {
   removals,
   deniedTools: topDenied,
   generatedAt: new Date().toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}),
+  pluginVersion: __dirname.match(/desire-path\/(\d+\.\d+\.\d+)\//)?.[1] || 'dev',
   pendingCount: dedupedSuggestions.filter(s=>s.outcome==='pending').length,
   deadCount: (inventory.artifacts||[]).filter(a=>a.status==='dead').length,
   staleCount: (inventory.artifacts||[]).filter(a=>a.status==='stale').length,
@@ -568,7 +569,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 <div class="foot">
   <span>desire-path · v4 · observatory</span>
   <em>detect · propose · pave · measure · clean</em>
-  <span>generated ${DATA.generatedAt}</span>
+  <span>generated ${DATA.generatedAt} · plugin v${DATA.pluginVersion}</span>
 </div>
 
 </div>
@@ -1206,10 +1207,10 @@ function buildPatterns(){
       <div class="panel-title">Detected Patterns · ranked by frequency</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="panel-meta">\${activeCount} active · \${D.patterns.length} total · re-scanned every 5 sessions</div>
-        \${resolvedCount>0?'<span class="pat-show-btn" id="pat-toggle">show resolved ('+resolvedCount+')</span>':''}
+        \${resolvedCount>0?'<span class="pat-show-btn" id="pat-toggle">hide resolved ('+resolvedCount+')</span>':''}
       </div>
     </div>
-    <div id="pat-list">\${pats}</div>
+    <div id="pat-list" data-show-all>\${pats}</div>
     <div class="panel-head" style="border:1px solid var(--line);background:var(--panel);padding:14px 20px;margin:24px 0 8px">
       <div class="panel-title">Suggestion Log · most recent first</div>
       <div style="display:flex;align-items:center;gap:10px">
@@ -1226,7 +1227,7 @@ function buildPatterns(){
     const l = document.getElementById('pat-list');
     const on = l.hasAttribute('data-show-all');
     on ? l.removeAttribute('data-show-all') : l.setAttribute('data-show-all','');
-    tBtn.textContent = on ? 'show resolved ('+resolvedCount+')' : 'hide resolved';
+    tBtn.textContent = on ? 'show resolved ('+resolvedCount+')' : 'hide resolved ('+resolvedCount+')';
   };
   ['all','accepted','dismissed'].forEach(f => {
     const btn = document.getElementById('sug-'+f);
