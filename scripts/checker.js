@@ -16,6 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 
 const DIR = path.join(os.homedir(), '.claude', 'desire-path');
 const SESSIONS        = path.join(DIR, 'sessions.jsonl');
@@ -23,8 +24,29 @@ const ANALYSIS_DUE    = path.join(DIR, 'analysis-due.json');
 const LAST_SUGGEST    = path.join(DIR, 'last-suggestion.json');
 const SUGGESTIONS     = path.join(DIR, 'suggestions.jsonl');
 const LATEST_ANALYSIS = path.join(DIR, 'latest-analysis.json');
+const INVENTORY       = path.join(DIR, 'inventory.json');
+const PAVED           = path.join(DIR, 'paved.jsonl');
 
 const DEEP_ANALYSIS_INTERVAL = 25; // sessions between deep analysis suggestions
+const OFFLINE = process.env.DESIRE_PATH_OFFLINE === '1';
+
+// ── Pattern fingerprinting ───────────────────────────────────────────────────
+// Stable hash of (type, normalized_trigger) so dedup survives phrasing changes.
+
+function normalizeTrigger(s = '') {
+  return String(s)
+    .toLowerCase()
+    .replace(/^\s*(please\s+)?(can\s+you\s+|could\s+you\s+|run\s+|make\s+|create\s+|add\s+|write\s+)+/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
+function fingerprint(type, trigger) {
+  const key = `${type}::${normalizeTrigger(trigger)}`;
+  return crypto.createHash('sha1').update(key).digest('hex').slice(0, 10);
+}
 
 function acceptedTypes() {
   try {
@@ -36,6 +58,47 @@ function acceptedTypes() {
         .filter(Boolean)
     );
   } catch { return new Set(); }
+}
+
+function readSuggestions() {
+  try {
+    return fs.readFileSync(SUGGESTIONS, 'utf8').split('\n').filter(Boolean)
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+  } catch { return []; }
+}
+
+// Returns set of fingerprints that were dismissed within the last `windowDays`.
+function dismissedFingerprints(windowDays = 30) {
+  const cutoff = Date.now() - windowDays * 86400000;
+  return new Set(
+    readSuggestions()
+      .filter(e => (e.outcome === 'dismissed' || e.outcome === 'rejected'))
+      .filter(e => !e.at || new Date(e.at).getTime() >= cutoff)
+      .map(e => e.pattern?.fingerprint || (e.pattern ? fingerprint(e.pattern.type, e.pattern.trigger || e.pattern.description || '') : null))
+      .filter(Boolean)
+  );
+}
+
+// Outcome-weighted confidence: if recently-paved artifacts of a type are mostly
+// dead, demote that type's confidence so the detector stops over-suggesting it.
+function outcomeWeights() {
+  const weights = { command: 0, skill: 0, hook: 0, agent: 0, claude_md: 0 };
+  try {
+    const inv = JSON.parse(fs.readFileSync(INVENTORY, 'utf8'));
+    const all = inv.artifacts || [];
+    const isRecent = a => {
+      if (!a.created) return false;
+      return (Date.now() - new Date(a.created).getTime()) <= 60 * 86400000;
+    };
+    for (const t of Object.keys(weights)) {
+      const recent = all.filter(a => a.type === t && isRecent(a));
+      if (recent.length < 3) continue;
+      const dead = recent.filter(a => a.status === 'dead').length;
+      if (dead / recent.length >= 0.5) weights[t] = -1;
+    }
+  } catch {}
+  return weights;
 }
 
 function readSessions(n = 25) {
@@ -75,23 +138,47 @@ function detect(sessions) {
     });
   }
 
-  // 2. SKILL candidate: repeated prompt prefix (template pattern)
+  // 2. COMMAND vs SKILL candidate: repeated prompt prefix (template pattern)
+  // Command if the full prompt structure is stable (low variance in prompt length
+  // and consistent following words). Skill if only the opening is similar but the
+  // body varies — the user describes the same kind of problem differently each time.
   const allPrompts = sessions.flatMap(s => (s.prompts || []).map(p => p.p || ''));
   const prefixMap = {};
+  const prefixSamples = {};
   allPrompts.forEach(p => {
     const key = p.toLowerCase().split(/\s+/).slice(0, 5).join(' ');
-    if (key.length > 15) prefixMap[key] = (prefixMap[key] || 0) + 1;
+    if (key.length <= 15) return;
+    prefixMap[key] = (prefixMap[key] || 0) + 1;
+    (prefixSamples[key] = prefixSamples[key] || []).push(p);
   });
   const topPrefix = Object.entries(prefixMap).sort((a,b) => b[1]-a[1])[0];
   if (topPrefix && topPrefix[1] >= 4) {
-    results.push({
-      type: 'skill',
-      confidence: 'high',
-      frequency: topPrefix[1],
-      description: `You keep asking "${topPrefix[0]}..." (${topPrefix[1]}×) — a skill would turn this into a /command`,
-      artifact: 'skill',
-      action: 'run /desire-path:suggest to create the skill'
-    });
+    const samples = prefixSamples[topPrefix[0]] || [];
+    const lens = samples.map(s => s.length);
+    const mean = lens.reduce((a,b) => a+b, 0) / lens.length;
+    const variance = lens.reduce((a,l) => a + (l-mean)**2, 0) / lens.length;
+    const stddev = Math.sqrt(variance);
+    // Stable structure → command. Variable phrasing → skill.
+    const isCommand = stddev < Math.max(20, mean * 0.35) && mean < 200;
+    if (isCommand) {
+      results.push({
+        type: 'command',
+        confidence: 'high',
+        frequency: topPrefix[1],
+        description: `You keep asking "${topPrefix[0]}..." (${topPrefix[1]}×) with the same structure — a /command would fire it in one keystroke`,
+        artifact: 'command',
+        action: 'run /desire-path:suggest to create the command'
+      });
+    } else {
+      results.push({
+        type: 'skill',
+        confidence: 'high',
+        frequency: topPrefix[1],
+        description: `You keep asking about "${topPrefix[0]}..." (${topPrefix[1]}×) with varying phrasing — a skill would auto-load the right playbook`,
+        artifact: 'skill',
+        action: 'run /desire-path:suggest to create the skill'
+      });
+    }
   }
 
   // 3. HOOK candidate: same tool always followed by same tool (sequence)
@@ -156,8 +243,8 @@ function detect(sessions) {
     const isStopCandidate = /git (status|diff|log)|npm test|jest|pytest|make test|lint/.test(cmd);
     const isStartCandidate = /npm (install|run dev|start)|yarn (dev|start)|docker|brew/.test(cmd);
     const hookEvent = isStopCandidate ? 'Stop' : isStartCandidate ? 'Start' : null;
-    const artifactType = hookEvent ? 'hook' : 'skill';
-    const artifactLabel = hookEvent ? `${hookEvent} hook` : '/command skill';
+    const artifactType = hookEvent ? 'hook' : 'command';
+    const artifactLabel = hookEvent ? `${hookEvent} hook` : '/command';
     results.push({
       type: artifactType,
       confidence: sessionCount >= 6 ? 'high' : 'medium',
@@ -174,6 +261,7 @@ function detect(sessions) {
 }
 
 async function claudeRefine(sessions, localPattern) {
+  if (OFFLINE) return localPattern;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return localPattern;
 
@@ -188,7 +276,7 @@ async function claudeRefine(sessions, localPattern) {
 
 Return ONLY valid JSON (no markdown):
 {
-  "type": "claude_md|skill|hook|agent",
+  "type": "claude_md|command|skill|hook|agent",
   "confidence": "high|medium",
   "frequency": <number>,
   "description": "specific one-sentence description naming the actual pattern",
@@ -198,9 +286,12 @@ Return ONLY valid JSON (no markdown):
 
 Type guide:
 - claude_md: always-on context repeated every session → belongs in CLAUDE.md
-- skill: repeated prompt template → /command shortcut
-- hook: post-tool automation → fires without asking
-- agent: complex domain workflow → isolated sub-agent
+- command: user-fired prompt with stable structure + variable args → /slug <args>
+- skill: same kind of request phrased differently → auto-loaded playbook
+- hook: deterministic post-tool reaction → fires without asking
+- agent: complex multi-turn domain workflow → isolated sub-agent
+
+Command vs skill: command if the steps are fixed and only the args vary; skill if Claude needs to reason differently each time.
 
 Only return high/medium confidence. If nothing clear: {"type":"none"}`,
     messages: [{
@@ -236,7 +327,8 @@ Only return high/medium confidence. If nothing clear: {"type":"none"}`,
 function buildReason(pattern) {
   const typeInstructions = {
     claude_md: `Proactively tell the user: "I noticed you've been repeating the same context in multiple sessions. I can add this to your CLAUDE.md so you never have to say it again — want me to do that?" Then offer to run /desire-path:suggest.`,
-    skill: `Proactively tell the user: "I keep seeing this same type of request. I could turn it into a skill you can invoke with one command — should I create it?" Then offer to run /desire-path:suggest.`,
+    command: `Proactively tell the user: "I keep seeing the same request with the same shape. I could turn it into a slash command you fire as /slug <args> — want me to create it?" Then offer to run /desire-path:suggest.`,
+    skill: `Proactively tell the user: "I keep seeing this same type of request phrased different ways. I could turn it into a skill that auto-loads the right playbook — should I create it?" Then offer to run /desire-path:suggest.`,
     hook: `Proactively tell the user: "I noticed you always do X right after Y. A hook could automate that completely — want me to set it up?" Then offer to run /desire-path:suggest.`,
     agent: `Proactively tell the user: "These sessions look like a recurring workflow that might benefit from a dedicated agent with the right context pre-loaded — interested?" Then offer to run /desire-path:suggest.`
   };
@@ -254,16 +346,19 @@ function writeAnalysis(pattern, totalSessions) {
     const existingAge = totalSessions - (existing?._session_count_at_analysis || 0);
     if (existing && existingAge < 5 && (existing.top_paths?.[0]?.frequency || 0) >= pattern.frequency) return;
 
+    const triggerSeed = pattern.trigger || pattern.description || pattern.action || '';
     const entry = {
       rank: 1,
       type: pattern.type,
       description: pattern.description,
       evidence: [],
       frequency: pattern.frequency,
+      fingerprint: fingerprint(pattern.type, triggerSeed),
       suggested_artifact: {
-        type: pattern.type === 'claude_md' ? 'claude_md' : pattern.artifact || pattern.type,
+        type: pattern.type,
         name: '',
-        trigger: pattern.action || ''
+        trigger: pattern.action || '',
+        fingerprint: fingerprint(pattern.type, triggerSeed)
       }
     };
     const existing_paths = existing?.top_paths?.filter(p => p.type !== pattern.type) || [];
@@ -335,17 +430,49 @@ async function main() {
 
   // Pattern detection runs regardless of cooldown — Tier 1 write must always happen
   const done = acceptedTypes();
+  const dismissed = dismissedFingerprints(30);
+  const weights = outcomeWeights();
   let pattern = null;
+  let localPattern = null;
+  let haikuAgreed = false;
   if (sessions.length >= 3) {
-    pattern = detect(sessions);
+    localPattern = detect(sessions);
+    pattern = localPattern;
     if (pattern && done.has(pattern.type)) pattern = null;
+    if (pattern) {
+      const fp = fingerprint(pattern.type, pattern.trigger || pattern.description);
+      if (dismissed.has(fp)) pattern = null;
+    }
     if (sessions.length >= 8) {
-      pattern = await claudeRefine(sessions, pattern) || pattern;
+      const refined = await claudeRefine(sessions, pattern);
+      if (refined && refined !== pattern) {
+        haikuAgreed = !!(localPattern && refined.type === localPattern.type);
+        pattern = refined;
+      }
       if (pattern && done.has(pattern.type)) pattern = null;
+      if (pattern) {
+        const fp = fingerprint(pattern.type, pattern.trigger || pattern.description);
+        if (dismissed.has(fp)) pattern = null;
+      }
+    }
+    // Outcome weighting: demote types whose recently-paved artifacts are mostly dead
+    if (pattern && weights[pattern.type] === -1) {
+      pattern.confidence = pattern.confidence === 'high' ? 'medium' : 'low';
+      pattern._demoted_by_outcome = true;
     }
   }
 
+  // Storage gate: any non-low-confidence pattern is worth persisting for the dashboard.
   const hasPattern = pattern && pattern.confidence !== 'low';
+
+  // Surface gate (stricter): only interrupt the user when evidence is strong.
+  // Require frequency ≥6, OR Haiku agreed with the local detector on the type,
+  // OR the pattern is a CLAUDE.md addition with high confidence (cheap to accept).
+  const shouldSurface = hasPattern && (
+    (pattern.frequency || 0) >= 6 ||
+    haikuAgreed ||
+    (pattern.type === 'claude_md' && pattern.confidence === 'high')
+  ) && !pattern._demoted_by_outcome;
 
   // Tier 1: always persist to latest-analysis.json so dashboard is never empty
   if (hasPattern) {
@@ -387,9 +514,10 @@ async function main() {
     process.exit(0);
   }
 
-  // Surface pattern suggestion
-  if (hasPattern) {
-    fs.writeFileSync(LAST_SUGGEST, JSON.stringify({ at: new Date().toISOString(), pattern }));
+  // Surface pattern suggestion (stricter gate than storage)
+  if (shouldSurface) {
+    const fp = fingerprint(pattern.type, pattern.trigger || pattern.description);
+    fs.writeFileSync(LAST_SUGGEST, JSON.stringify({ at: new Date().toISOString(), pattern: { ...pattern, fingerprint: fp } }));
     try { fs.unlinkSync(ANALYSIS_DUE); } catch {}
     process.stdout.write(JSON.stringify({ decision: 'block', reason: buildReason(pattern) }));
     process.exit(0);

@@ -44,32 +44,42 @@ Wait for confirmation before deleting anything. Never auto-delete.
 
 ## Step 4 — Remove confirmed artifacts
 
-For each confirmed removal:
+Match the removal command to the artifact's `type` field from the inventory — do not guess from the path:
 
-**Skill/command (directory):**
+**`type: "skill"`** — always a directory containing `SKILL.md`. Use the `dir` field from inventory:
 ```bash
 rm -rf /path/to/skill-dir
 ```
 
-**Skill/command (flat file):**
+**`type: "command"`** — always a flat `.md` file under a `commands/` folder. Use the `path` field:
 ```bash
 rm /path/to/command.md
 ```
 
-**Agent:**
+**`type: "agent"`** — flat `.md` file under an `agents/` folder. Use the `path` field:
 ```bash
 rm /path/to/agent.md
 ```
 
-**Hook** (more careful — edit settings.json):
-Read `~/.claude/settings.json`, remove the specific hook entry from the correct event array, write back. Never remove the entire hooks block.
+**`type: "hook"`** (more careful — edit settings.json):
+Read `~/.claude/settings.json` (or the project equivalent from inventory `path`), remove the specific hook entry from the correct event array, write back. Never remove the entire hooks block.
 
-## Step 5 — Log removals
+## Step 5 — Log and close the loop
 
-Append to `~/.claude/desire-path/removals.jsonl`:
+For each removal, do **all three**:
+
+**5a. Append to `~/.claude/desire-path/removals.jsonl`:**
 ```json
 {"at":"<iso>","name":"<name>","type":"<type>","reason":"dead|stale","uses":<n>}
 ```
+
+**5b. Tombstone the matching `paved.jsonl` entry** so the dashboard's paved count and the pattern-detector's "already-paved" check stay accurate. Read `~/.claude/desire-path/paved.jsonl`, drop any line whose `name` and `type` match the removed artifact, write the file back.
+
+**5c. Append a `dismissed` outcome to `~/.claude/desire-path/suggestions.jsonl`** so the pattern-detector's anti-pattern rule #4 stops it from re-suggesting the same pattern next cycle. Include the `fingerprint` from the matching `paved.jsonl` line (when present) — the detector dedups by fingerprint:
+```json
+{"at":"<iso>","pattern":{"type":"<type>","trigger":"<name>","fingerprint":"<10-hex>"},"outcome":"dismissed","reason":"removed_as_dead"}
+```
+If no `fingerprint` was logged when the artifact was paved, omit the field — the detector falls back to recomputing one from `(type, trigger)`.
 
 Confirm: "Removed X artifact(s). Your config is leaner now."
 

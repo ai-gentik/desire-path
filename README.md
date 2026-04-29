@@ -66,7 +66,8 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 
 | Command | What it does |
 |---|---|
-| `/desire-path:suggest` | Writes skill / hook / agent / CLAUDE.md addition to disk |
+| `/desire-path:review` | Pull-mode: show current patterns without paving anything |
+| `/desire-path:suggest` | Writes command / skill / hook / agent / CLAUDE.md addition to disk |
 | `/desire-path:cleanup` | Interactive removal of dead/stale artifacts |
 | `/desire-path:dashboard` | Starts live dashboard server at localhost:2337 and opens in browser |
 | `/desire-path:stop-server` | Stops the dashboard server |
@@ -84,9 +85,12 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 | Pattern detected | Artifact written |
 |---|---|
 | Repeated project context every session | `~/.claude/CLAUDE.md` addition |
-| Repeated prompt template | `~/.claude/skills/<n>/SKILL.md` |
-| Always X then Y tool sequence | Hook in `~/.claude/settings.json` |
-| Complex multi-turn workflow | `~/.claude/agents/<n>.md` |
+| User-fired prompt with stable steps + variable args | `~/.claude/commands/<n>.md` |
+| Recurring class of question phrased differently | `~/.claude/skills/<n>/SKILL.md` |
+| Always X then Y tool sequence (deterministic) | Hook in `~/.claude/settings.json` |
+| Complex multi-turn workflow on a stable subdomain | `~/.claude/agents/<n>.md` |
+
+Project-scoped versions are written under `<project>/.claude/...` instead — useful for artifacts teammates should share via git.
 
 ---
 
@@ -95,6 +99,24 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 All data in `~/.claude/desire-path/`. Self-compacting: `sessions.jsonl` stays under 100 entries, `usage.jsonl` under 200 rows — older data aggregated automatically on every Stop.
 
 Tracked per session: prompts, tool calls, skill invocations, slash commands, agent dispatches, hook executions, permission denials.
+
+---
+
+## Privacy
+
+Everything the plugin records lives in `~/.claude/desire-path/` on your machine. Nothing is uploaded by default.
+
+**One optional outbound call**: when `ANTHROPIC_API_KEY` is set in the environment, the Stop-hook checker may send a short summary of the last ≤10 sessions (tools used, skill names, top bash commands, prompt prefixes truncated to 50 chars) to Claude Haiku to refine a *strong* local detection. This is an opt-in via the env var, capped at one call per Stop, and bypassed entirely if the local detector found nothing worth refining.
+
+**To disable the Haiku call entirely**, set:
+
+```bash
+export DESIRE_PATH_OFFLINE=1
+```
+
+The plugin then runs purely on local heuristics — no outbound traffic, no API key needed. The deep `@agent-pattern-detector` agent still works (it runs through your normal Claude Code session, not a side channel).
+
+**To stop logging entirely**, remove the plugin from `~/.claude/settings.json` or delete `~/.claude/desire-path/`. There's no telemetry to opt out of beyond that.
 
 ---
 

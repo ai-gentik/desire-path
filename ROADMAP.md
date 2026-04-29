@@ -22,6 +22,13 @@ Desire-path has two tracks:
 - Live dashboard server (localhost:2337) with Map tab — aerial SVG of artifacts + desire lines
 - Two-tier pattern analysis: fast local heuristics + optional Haiku refinement
 - Suggestion log with status pills (detected → proposed → paved / dismissed)
+- **Five artifact types** including `command` (user-fired prompt with stable steps + variable args), distinct from `skill` (auto-loaded playbook for variably-phrased problems)
+- **Stable pattern fingerprints** — sha1 of `(type, normalized_trigger)` carried through `latest-analysis.json`, `paved.jsonl`, and `suggestions.jsonl` so dedup survives phrasing changes
+- **Surface vs storage threshold split** — pattern detection persists at n≥4 but the Stop-hook only interrupts at n≥6 or when Haiku agrees with the local detector
+- **Outcome-weighted confidence** — types whose recently-paved artifacts are mostly dead get demoted automatically until the user starts using them again
+- **CLAUDE.md token-budget guard** — `suggest` warns at >2KB, refuses at >5KB and proposes a skill instead
+- **Offline mode** — `DESIRE_PATH_OFFLINE=1` disables the optional Haiku refinement; everything else still works
+- **Pull-mode review** — `/desire-path:review` shows current patterns without writing, for users who'd rather check in than be nudged
 
 ---
 
@@ -66,6 +73,29 @@ Detect repeated bad habits and surface a better path.
 
 ---
 
+## Trust & quality (new track)
+
+The biggest risk to adoption is suggestion noise. These items raise the signal-to-noise ratio of what surfaces.
+
+### Dashboard surface for fingerprints & outcome weights
+- Show the active fingerprint dedup set and the per-type outcome weights on the Patterns tab
+- Lets users *see* why a pattern they expected isn't being suggested (e.g. "demoted because 3 of your last 5 skills went unused")
+- Closes the explanation gap on the smarter detector
+
+### Pattern-detector outcome telemetry
+- Currently `outcomeWeights()` runs in checker.js but the deep agent doesn't read inventory yet
+- Have `@agent-pattern-detector` produce per-type acceptance and survival stats and write them to `latest-analysis.json` so the dashboard can show "Skills you create stick 4/5 of the time; commands stick 1/3"
+
+### Per-pattern surface threshold tuning
+- Today the surface gate is a single rule (`freq ≥ 6` or Haiku agreement). Make it per-type: hooks should require ≥7, claude_md only ≥4, etc.
+- Reflects that hook false positives are more painful than CLAUDE.md ones
+
+### Team-share guidance
+- When a pattern is paved at project scope, surface a one-liner reminding the user to commit `.claude/skills/` or `.claude/commands/` so teammates get the same paths
+- Optional: detect if `.claude/` is gitignored and warn
+
+---
+
 ## Priority order
 
 | # | Item | Track | Effort | Value | Status |
@@ -75,9 +105,20 @@ Detect repeated bad habits and surface a better path.
 | 3 | Fix assistant-driven false positives | infra | Low | High | ✅ done |
 | 4 | Permission denial tracking | pave | Low | Medium | ✅ done |
 | 5 | Stale skill detector | pave | Low | Medium | ✅ done |
-| 6 | File co-access patterns | pave | Medium | High | — |
-| 7 | Cross-session file hotspots | pave | Low | Medium | — |
-| 8 | Tool retry / error patterns | pave | Medium | Medium | — |
-| 9 | MCP tool usage + dead weight | pave | Low | Medium | — |
-| 10 | Permission denial → suggestion CTA | pave | Low | Medium | — |
-| 11 | Bad prompting patterns | reroute | Medium | High | — |
+| 6 | Command artifact + skill/command split | infra | Medium | High | ✅ done |
+| 7 | Pattern fingerprint dedup | trust | Low | High | ✅ done |
+| 8 | Surface vs storage threshold split | trust | Low | High | ✅ done |
+| 9 | Outcome-weighted confidence | trust | Medium | High | ✅ done |
+| 10 | CLAUDE.md token-budget guard | trust | Low | Medium | ✅ done |
+| 11 | Offline mode (`DESIRE_PATH_OFFLINE`) | infra | Low | Medium | ✅ done |
+| 12 | Pull-mode `/desire-path:review` | infra | Low | Medium | ✅ done |
+| 13 | File co-access patterns | pave | Medium | High | — |
+| 14 | Cross-session file hotspots | pave | Low | Medium | — |
+| 15 | Tool retry / error patterns | pave | Medium | Medium | — |
+| 16 | MCP tool usage + dead weight | pave | Low | Medium | — |
+| 17 | Permission denial → suggestion CTA | pave | Low | Medium | — |
+| 18 | Bad prompting patterns | reroute | Medium | High | — |
+| 19 | Dashboard surface for fingerprints & outcome weights | trust | Low | Medium | — |
+| 20 | Pattern-detector outcome telemetry | trust | Medium | Medium | — |
+| 21 | Per-pattern surface threshold tuning | trust | Low | Medium | — |
+| 22 | Team-share guidance for project-scoped artifacts | pave | Low | Medium | — |
