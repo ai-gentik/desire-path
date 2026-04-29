@@ -59,8 +59,7 @@ Read `<project_cwd>/.claude/CLAUDE.md` (create if missing). Add a concise sectio
 ```
 Write the file. Don't duplicate existing content.
 
-### For a skill:
-Skills are always global (invoked by name across all projects).
+### For a global skill:
 Create `~/.claude/skills/<slug>/SKILL.md`:
 ```markdown
 ---
@@ -71,6 +70,9 @@ description: >
 # <Title>
 <Instructions derived from the repeated prompts>
 ```
+
+### For a project skill:
+Create `<project_cwd>/.claude/skills/<slug>/SKILL.md` with the same format. Available only within that project — useful for project-specific workflows that teammates can share via version control.
 
 ### For a global hook:
 Read `~/.claude/settings.json`. Merge in the new hook, preserve all existing ones:
@@ -98,7 +100,7 @@ Read `<project_cwd>/.claude/settings.json` (create if missing). Merge in the new
 }
 ```
 
-### For an agent:
+### For a global agent:
 Create `~/.claude/agents/<slug>.md`:
 ```markdown
 ---
@@ -111,6 +113,9 @@ maxTurns: 15
 <System prompt derived from the repeated workflow>
 ```
 
+### For a project agent:
+Create `<project_cwd>/.claude/agents/<slug>.md` with the same format. Available only within that project — useful for project-specific review or automation agents teammates can share via version control.
+
 ## Step 4 — Log and confirm
 
 Append to `~/.claude/desire-path/paved.jsonl`:
@@ -121,10 +126,12 @@ Append to `~/.claude/desire-path/paved.jsonl`:
 Tell the user what was created, where it lives, and how it activates:
 - Global CLAUDE.md: "Added to `~/.claude/CLAUDE.md` — active in all projects from your next session."
 - Project CLAUDE.md: "Added to `<project>/.claude/CLAUDE.md` — active only in that project from your next session."
-- Skill: "Use `/slug` or auto-triggers when you ask about [x]. Available in all projects."
+- Global skill: "Use `/slug` or auto-triggers when you ask about [x]. Available in all projects."
+- Project skill: "Use `/slug` or auto-triggers when you ask about [x]. Available in `<project>` only — commit `.claude/skills/` to share with teammates."
 - Global hook: "Added to `~/.claude/settings.json` — fires automatically in all projects after every [ToolName] call."
 - Project hook: "Added to `<project>/.claude/settings.json` — fires only in that project after every [ToolName] call."
-- Agent: "Spawned by Claude when [trigger]."
+- Global agent: "Spawned by Claude when [trigger]. Available in all projects."
+- Project agent: "Spawned by Claude when [trigger]. Available in `<project>` only — commit `.claude/agents/` to share with teammates."
 
 ## Step 5 — Log the suggestion outcome
 
