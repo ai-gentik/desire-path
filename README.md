@@ -68,7 +68,8 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 |---|---|
 | `/desire-path:suggest` | Writes skill / hook / agent / CLAUDE.md addition to disk |
 | `/desire-path:cleanup` | Interactive removal of dead/stale artifacts |
-| `/desire-path:dashboard` | Generates and opens HTML dashboard in browser |
+| `/desire-path:dashboard` | Starts live dashboard server at localhost:2337 and opens in browser |
+| `/desire-path:stop-server` | Stops the dashboard server |
 
 ---
 
@@ -93,10 +94,14 @@ Dashboard shows: detected → proposed → paved → usage → cleanup
 
 All data in `~/.claude/desire-path/`. Self-compacting: `sessions.jsonl` stays under 100 entries, `usage.jsonl` under 200 rows — older data aggregated automatically on every Stop.
 
+Tracked per session: prompts, tool calls, skill invocations, slash commands, agent dispatches, hook executions, permission denials.
+
 ---
 
 ## Dashboard
 
-Three tabs: **Overview** (activity, tool usage, paved paths), **Patterns** (detected + proposed), **Inventory** (full artifact audit with dead/stale flags).
+Live HTTP server at `localhost:2337` — starts automatically on session load via `InstructionsLoaded` hook.
 
-Run `/desire-path:dashboard` to open.
+Four tabs: **Overview** (activity, tool usage, paved paths), **Map** (aerial SVG of artifacts + desire lines across sessions), **Patterns** (detected + proposed, with paved/dismissed status), **Inventory** (full artifact audit with dead/stale flags).
+
+Run `/desire-path:dashboard` to start/open, `/desire-path:stop-server` to kill.

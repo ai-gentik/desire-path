@@ -13,11 +13,15 @@ Desire-path has two tracks:
 ## What we currently capture
 - Sessions: turns, tools used per session, skills invoked
 - Usage totals: tool/skill frequency with compaction
-- Paved paths and suggestion outcomes
+- Slash commands and agent dispatches
+- Paved paths and suggestion outcomes (including dismissed tracking)
 - Bash commands (repeated command detection)
 - Permission denials
 - Activity heatmap (hour × weekday)
 - Stale skill detection
+- Live dashboard server (localhost:2337) with Map tab — aerial SVG of artifacts + desire lines
+- Two-tier pattern analysis: fast local heuristics + optional Haiku refinement
+- Suggestion log with status pills (detected → proposed → paved / dismissed)
 
 ---
 
