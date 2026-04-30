@@ -146,6 +146,7 @@ After writing `latest-analysis.json`, immediately read it back and verify:
 2. `_generated_by === "pattern-detector"` (not `"checker-local"` or any other value).
 3. `_generated_at` is within the last 60 seconds.
 4. `top_paths` is an array (may be empty, but must be present).
+5. Before writing, filter `top_paths`: load `~/.claude/desire-path/paved.jsonl` and collect all `fingerprint` values. Load `~/.claude/desire-path/suggestions.jsonl` and collect `fingerprint` from entries where `outcome === "accepted"`. Remove any `top_paths` entry whose `fingerprint` appears in either set. If this reduces `top_paths` to an empty array, that is correct — write it as `[]`.
 
 If any check fails:
 - Retry the write once.
