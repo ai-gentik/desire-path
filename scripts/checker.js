@@ -361,7 +361,25 @@ function writeAnalysis(pattern, totalSessions) {
         fingerprint: fingerprint(pattern.type, triggerSeed)
       }
     };
-    const existing_paths = existing?.top_paths?.filter(p => p.type !== pattern.type) || [];
+    // Build set of resolved fingerprints: paved artifacts + accepted suggestions
+    const resolvedFps = new Set();
+    try {
+      fs.readFileSync(PAVED, 'utf8').split('\n').filter(Boolean)
+        .forEach(l => { try { const p = JSON.parse(l); if (p.fingerprint) resolvedFps.add(p.fingerprint); } catch {} });
+    } catch {}
+    try {
+      fs.readFileSync(SUGGESTIONS, 'utf8').split('\n').filter(Boolean)
+        .forEach(l => { try { const s = JSON.parse(l); if (s.outcome === 'accepted' && s.pattern?.fingerprint) resolvedFps.add(s.pattern.fingerprint); } catch {} });
+    } catch {}
+
+    const existing_paths = (existing?.top_paths || [])
+      .filter(p => p.type !== pattern.type)
+      .filter(p => !p.fingerprint || !resolvedFps.has(p.fingerprint));
+
+    // Skip if the new pattern itself is already resolved
+    const newFp = fingerprint(pattern.type, triggerSeed);
+    if (resolvedFps.has(newFp)) return;
+
     const analysis = {
       _session_count_at_analysis: totalSessions,
       _generated_by: 'checker-local',
