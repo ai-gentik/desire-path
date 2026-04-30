@@ -13,7 +13,7 @@ Perform a conventional commit, optional version bump, and push using the persona
 ## Steps
 
 1. **Stage** — add the relevant files (never `git add -A` blindly; check `git status` first)
-2. **Bump version** — check the latest version from `git log --oneline -5`, increment the patch (e.g. v2.1.6 → v2.1.7)
+2. **Bump version** — check the latest version from `git log --oneline -5`, increment the patch (e.g. v2.1.9 → v2.1.10)
 3. **Commit** — always include the version in the message: `chore: bump to vX.Y.Z`
 4. **Push** — always use the personal SSH key:
    ```bash

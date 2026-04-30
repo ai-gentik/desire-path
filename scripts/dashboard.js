@@ -365,6 +365,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 #pat-list:not([data-show-all]) [data-resolved]{display:none}
 #sug-list[data-filter="accepted"] .log-row:not([data-outcome="accepted"]){display:none}
 #sug-list[data-filter="dismissed"] .log-row:not([data-outcome="dismissed"]){display:none}
+#sug-list[data-filter="pending"] .log-row:not([data-outcome="pending"]){display:none}
 
 .log{border:1px solid var(--line);background:var(--panel)}
 .log-row{display:grid;grid-template-columns:80px 14px 1fr 80px 80px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);align-items:center}
@@ -435,10 +436,21 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .map-cap-subtitle{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:oklch(0.55 0.03 80);margin-left:10px;font-family:'JetBrains Mono',monospace}
 .map-cap-sub{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .map-filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.map-filter-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;transition:all .15s ease;border-radius:2px}
+.map-filter-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;transition:all .15s ease;border-radius:2px;display:inline-flex;align-items:center;gap:6px}
 .map-filter-btn:hover{border-color:var(--signal);color:var(--ink)}
 .map-filter-btn.active{background:oklch(0.20 0.04 80);border-color:var(--signal);color:var(--signal)}
 .map-filter-sep{width:1px;height:14px;background:var(--line);margin:0 3px}
+/* Grouped layer toggles — coloured swatch makes it read as additive */
+.map-filter-btn[data-group]::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--swatch,var(--muted));flex-shrink:0;transition:opacity .15s ease,filter .15s ease;opacity:.85}
+.map-filter-btn[data-group]:not(.active)::before{opacity:.3;filter:grayscale(.6)}
+.map-filter-btn[data-group="status"][data-filter="walked"]{--swatch:oklch(0.72 0.14 75)}
+.map-filter-btn[data-group="status"][data-filter="paved"]{--swatch:oklch(0.55 0.04 90)}
+.map-filter-btn[data-group="status"][data-filter="stale"]{--swatch:oklch(0.55 0.08 80)}
+.map-filter-btn[data-group="type"][data-filter="skill"]{--swatch:#d4a55a}
+.map-filter-btn[data-group="type"][data-filter="hook"]{--swatch:#7fb285}
+.map-filter-btn[data-group="type"][data-filter="agent"]{--swatch:#9a8db3}
+.map-filter-group{display:inline-flex;align-items:center;gap:4px;padding:0 6px;border:1px dashed var(--line);border-radius:3px;position:relative}
+.map-filter-group::after{content:attr(data-label);position:absolute;left:8px;top:-7px;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);background:var(--panel);padding:0 4px;line-height:1}
 
 .map-pin-label{font-family:'JetBrains Mono',monospace;font-size:9px;fill:var(--ink-2);letter-spacing:.04em;paint-order:stroke;stroke:oklch(0.12 0.02 90/.9);stroke-width:3px;stroke-linejoin:round}
 .map-pin-uses{font-family:'Fraunces',serif;font-size:11px;fill:var(--signal);font-style:italic;paint-order:stroke;stroke:oklch(0.12 0.02 90/.95);stroke-width:3px}
@@ -1054,16 +1066,18 @@ function buildMap(){
           <span class="map-cap-subtitle">// THE TERRAIN YOU'VE WORN</span>
         </div>
         <div class="map-filters" id="map-filters">
-          <button class="map-filter-btn active" data-filter="walked" title="Walked paths">walked</button>
-          <button class="map-filter-btn active" data-filter="paved" title="Freshly paved">paved</button>
-          <button class="map-filter-btn active" data-filter="stale" title="Stale & dead">stale</button>
-          <div class="map-filter-sep"></div>
-          <button class="map-filter-btn active" data-filter="desire" title="Desire lines">desire</button>
-          <button class="map-filter-btn active" data-filter="calls" title="Call arcs">calls</button>
-          <div class="map-filter-sep"></div>
-          <button class="map-filter-btn active" data-filter="skill" title="Skills">skill</button>
-          <button class="map-filter-btn active" data-filter="hook" title="Hooks">hook</button>
-          <button class="map-filter-btn active" data-filter="agent" title="Agents">agent</button>
+          <div class="map-filter-group" data-label="paths" title="Path layers — additive: deselect all to hide every path">
+            <button class="map-filter-btn active" data-group="status" data-filter="walked" title="Walked paths (in active use)">walked</button>
+            <button class="map-filter-btn active" data-group="status" data-filter="paved" title="Freshly paved (not yet walked)">paved</button>
+            <button class="map-filter-btn active" data-group="status" data-filter="stale" title="Stale &amp; dead">stale</button>
+          </div>
+          <button class="map-filter-btn active" data-filter="desire" title="Desire lines — detected but not paved">desire</button>
+          <button class="map-filter-btn active" data-filter="calls" title="Call arcs between artifacts">calls</button>
+          <div class="map-filter-group" data-label="types" title="Artifact types — additive: deselect all to hide every artifact">
+            <button class="map-filter-btn active" data-group="type" data-filter="skill" title="Skills">skill</button>
+            <button class="map-filter-btn active" data-group="type" data-filter="hook" title="Hooks">hook</button>
+            <button class="map-filter-btn active" data-group="type" data-filter="agent" title="Agents">agent</button>
+          </div>
         </div>
       </div>
       <div style="position:relative" id="map-stage">
@@ -1337,6 +1351,7 @@ function buildPatterns(){
       <div style="display:flex;align-items:center;gap:10px">
         <div class="panel-meta">\${D.suggestions.length} entries · \${D.pipeline.acceptRate}% acceptance</div>
         <span class="pat-show-btn active" id="sug-all">all</span>
+        <span class="pat-show-btn" id="sug-pending">pending</span>
         <span class="pat-show-btn" id="sug-accepted">accepted</span>
         <span class="pat-show-btn" id="sug-dismissed">dismissed</span>
       </div>
@@ -1350,13 +1365,13 @@ function buildPatterns(){
     on ? l.removeAttribute('data-show-all') : l.setAttribute('data-show-all','');
     tBtn.textContent = on ? 'show resolved ('+resolvedCount+')' : 'hide resolved ('+resolvedCount+')';
   };
-  ['all','accepted','dismissed'].forEach(f => {
+  ['all','pending','accepted','dismissed'].forEach(f => {
     const btn = document.getElementById('sug-'+f);
     if(!btn) return;
     btn.onclick = () => {
       const l = document.getElementById('sug-list');
       l.dataset.filter = f === 'all' ? '' : f;
-      ['all','accepted','dismissed'].forEach(x => {
+      ['all','pending','accepted','dismissed'].forEach(x => {
         document.getElementById('sug-'+x)?.classList.toggle('active', x===f);
       });
     };
