@@ -39,12 +39,26 @@ async function main() {
     }
   }
 
-  const { renderDashboard } = require('./dashboard.js');
+  const { renderDashboard, computeData } = require('./dashboard.js');
 
   fs.mkdirSync(DIR, { recursive: true });
 
   const server = http.createServer((req, res) => {
     if (req.url === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+    if (req.url === '/data' || req.url.startsWith('/data?')) {
+      try {
+        const data = computeData();
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify(data));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
     try {
       const html = renderDashboard();
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

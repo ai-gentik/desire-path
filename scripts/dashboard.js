@@ -22,7 +22,7 @@ function json(file, fb) {
   try { return JSON.parse(fs.readFileSync(file,'utf8')); } catch { return fb; }
 }
 
-function renderDashboard() {
+function computeData() {
 
 // First run inventory scan so data is fresh
 try {
@@ -195,13 +195,21 @@ const DATA = {
   stage,
 };
 
+return DATA;
+}
+
+function renderDashboard() {
+const DATA = computeData();
+const totalSessions = DATA.totalSessions;
+const acceptRate    = DATA.pipeline.acceptRate;
+const workingPaths  = DATA.pipeline.working;
+
 // ── HTML (Observatory — self-contained, vanilla JS) ──────────────────────────
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="60">
 <title>Desire Path · Observatory</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,400&display=swap" rel="stylesheet">
@@ -518,6 +526,21 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 .map-svg.hide-hook .map-pin[data-type="hook"],.map-svg.hide-hook .map-trail[data-type="hook"],.map-svg.hide-hook .map-trail-glow[data-type="hook"]{display:none}
 .map-svg.hide-agent .map-pin[data-type="agent"],.map-svg.hide-agent .map-trail[data-type="agent"],.map-svg.hide-agent .map-trail-glow[data-type="agent"]{display:none}
 
+/* ── Live status pill ───────────────────────────────────────── */
+.live{display:inline-flex;align-items:center;gap:8px;padding:4px 8px 4px 9px;border:1px solid var(--line-2);background:var(--panel-2);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);user-select:none}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);transition:background .2s ease,box-shadow .2s ease}
+.live[data-state="paused"] .live-dot{background:var(--muted);box-shadow:none}
+.live[data-state="loading"] .live-dot{background:var(--signal);animation:livePulse 1s ease-in-out infinite}
+.live[data-state="error"] .live-dot{background:var(--warn)}
+.live-text{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.live-text b{color:var(--ink);font-weight:500}
+.live-btn{font:inherit;background:none;border:1px solid var(--line);color:var(--ink-2);padding:2px 6px;cursor:pointer;letter-spacing:.1em;line-height:1;transition:border-color .15s ease,color .15s ease}
+.live-btn:hover{border-color:var(--signal);color:var(--ink)}
+.live-btn:active{transform:translateY(1px)}
+.live-flash{animation:liveFlash .8s ease-out}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 var(--signal)}50%{box-shadow:0 0 0 4px transparent}}
+@keyframes liveFlash{0%{box-shadow:0 0 0 0 var(--signal)}40%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
 </style>
 </head>
 <body>
@@ -526,13 +549,22 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 <div class="strip">
   <div class="strip-brand"><span class="dot"></span><b>desire-path</b><span style="color:var(--faint)">obs.</span></div>
   <div class="strip-mid">
-    <span>uptime <b>${totalSessions}</b> sess</span>
-    <span>last sweep <b>${DATA.generatedAt.split(',').pop().trim()}</b></span>
-    <span>pending <b style="color:var(--signal)">${DATA.pendingCount}</b></span>
-    <span>dead <b style="color:var(--warn)">${DATA.deadCount}</b></span>
-    <span>stale <b style="color:var(--muted)">${DATA.staleCount}</b></span>
+    <span>uptime <b id="strip-sessions">${totalSessions}</b> sess</span>
+    <span>last sweep <b id="strip-sweep">${DATA.generatedAt.split(',').pop().trim()}</b></span>
+    <span>pending <b id="strip-pending" style="color:var(--signal)">${DATA.pendingCount}</b></span>
+    <span>dead <b id="strip-dead" style="color:var(--warn)">${DATA.deadCount}</b></span>
+    <span>stale <b id="strip-stale" style="color:var(--muted)">${DATA.staleCount}</b></span>
   </div>
-  <div class="strip-right" style="display:flex;gap:12px;align-items:center"><span class="stage-badge">${DATA.stage}</span><span>v4 · observatory · <b>${DATA.generatedAt}</b></span></div>
+  <div class="strip-right" style="display:flex;gap:10px;align-items:center">
+    <span class="live" id="live" data-state="idle" title="Auto-refreshing every 60s">
+      <span class="live-dot"></span>
+      <span class="live-text" id="live-text">live · <b>0s</b> ago</span>
+      <button class="live-btn" id="live-refresh" title="Refresh now">↻</button>
+      <button class="live-btn" id="live-toggle" title="Pause auto-refresh">❚❚</button>
+    </span>
+    <span class="stage-badge" id="strip-stage">${DATA.stage}</span>
+    <span>v4 · observatory</span>
+  </div>
 </div>
 
 <div class="hero">
@@ -540,7 +572,7 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
     <div class="hero-eye">// pattern intelligence — observation log</div>
     <h1 class="hero-title">Where you <em>actually</em> walk.</h1>
     <p class="hero-sub">Continuous, silent telemetry on your Claude Code sessions. Tools fired, prompts repeated, sequences re-run — surfaced as candidate paths to pave.</p>
-    <div class="hero-tags">
+    <div class="hero-tags" id="hero-tags">
       <span class="tag">SIGNAL <b>${acceptRate>=50?'STRONG':acceptRate>=25?'OK':'WEAK'}</b></span>
       <span class="tag">PIPELINE <b>${workingPaths>0?'HEALTHY':'WARMING'}</b></span>
       ${DATA.deadCount>0?`<span class="tag">CLEANUP <b>${DATA.deadCount}</b></span>`:''}
@@ -586,13 +618,13 @@ button{font-family:inherit;cursor:pointer;background:none;border:none;outline:no
 <div class="foot">
   <span>desire-path · v4 · observatory</span>
   <em>detect · propose · pave · measure · clean</em>
-  <span>generated ${DATA.generatedAt} · plugin v${DATA.pluginVersion}</span>
+  <span id="foot-gen">generated ${DATA.generatedAt} · plugin v${DATA.pluginVersion}</span>
 </div>
 
 </div>
 
 <script>
-const D = ${JSON.stringify(DATA, null, 2)};
+let D = ${JSON.stringify(DATA, null, 2)};
 const fmt = (iso)=>{
   if(!iso) return "—";
   const d = new Date(iso);
@@ -605,35 +637,58 @@ const fmt = (iso)=>{
 const TYPE_COLOR = {skill:'var(--signal)',hook:'var(--good)',agent:'#9a8db3',claude_md:'var(--signal-dim)',command:'var(--ink-2)',plugin:'var(--ink-2)'};
 const typeCol = (t)=>TYPE_COLOR[t]||'var(--muted)';
 
-document.getElementById("big-total").textContent = D.totalSessions;
-document.getElementById("big-sub").textContent = D.archiveSessions+" arc · "+D.hotSessions+" hot";
-document.getElementById("big-rate").textContent = D.pipeline.acceptRate+"%";
-document.getElementById("big-rate-sub").textContent = D.pipeline.accepted+" of "+D.pipeline.proposed+" suggestions";
+function renderTop(){
+  document.getElementById("big-total").textContent = D.totalSessions;
+  document.getElementById("big-sub").textContent = D.archiveSessions+" arc · "+D.hotSessions+" hot";
+  document.getElementById("big-rate").textContent = D.pipeline.acceptRate+"%";
+  document.getElementById("big-rate-sub").textContent = D.pipeline.accepted+" of "+D.pipeline.proposed+" suggestions";
 
-const maxA = Math.max(...D.activity, 1);
-document.getElementById("hero-spark").innerHTML = D.activity.map(v=>{
-  const isPeak = v===maxA && v>0;
-  return \`<div class="col \${isPeak?'peak':''}" style="height:\${Math.max(2,Math.round(v/maxA*60))}px"></div>\`;
-}).join("");
+  const maxA = Math.max(...D.activity, 1);
+  document.getElementById("hero-spark").innerHTML = D.activity.map(v=>{
+    const isPeak = v===maxA && v>0;
+    return \`<div class="col \${isPeak?'peak':''}" style="height:\${Math.max(2,Math.round(v/maxA*60))}px"></div>\`;
+  }).join("");
 
-const fnData = [
-  {n:D.pipeline.detected, lbl:"Detected", meta:"patterns observed", cls:""},
-  {n:D.pipeline.proposed, lbl:"Proposed", meta:"surfaced to user", cls:""},
-  {n:D.pipeline.paved,    lbl:"Paved",    meta:"written to disk", cls:"signal"},
-  {n:D.pipeline.working,  lbl:"Walked",   meta:"used since paving", cls:"good"},
-];
-const fnMax = Math.max(...fnData.map(x=>x.n), 1);
-document.getElementById("funnel").innerHTML = fnData.map((f,i)=>\`
-  <div class="fn">
-    <div class="fn-num \${f.cls}">\${String(f.n).padStart(2,"0")}</div>
-    <div class="fn-lbl">\${f.lbl}</div>
-    <div class="fn-meta">\${f.meta}</div>
-    <div class="fn-bar" style="width:\${Math.round(f.n/fnMax*100)}%"></div>
-    \${i<fnData.length-1?'<div class="fn-arrow">›</div>':''}
-  </div>\`).join("");
+  const fnData = [
+    {n:D.pipeline.detected, lbl:"Detected", meta:"patterns observed", cls:""},
+    {n:D.pipeline.proposed, lbl:"Proposed", meta:"surfaced to user", cls:""},
+    {n:D.pipeline.paved,    lbl:"Paved",    meta:"written to disk", cls:"signal"},
+    {n:D.pipeline.working,  lbl:"Walked",   meta:"used since paving", cls:"good"},
+  ];
+  const fnMax = Math.max(...fnData.map(x=>x.n), 1);
+  document.getElementById("funnel").innerHTML = fnData.map((f,i)=>\`
+    <div class="fn">
+      <div class="fn-num \${f.cls}">\${String(f.n).padStart(2,"0")}</div>
+      <div class="fn-lbl">\${f.lbl}</div>
+      <div class="fn-meta">\${f.meta}</div>
+      <div class="fn-bar" style="width:\${Math.round(f.n/fnMax*100)}%"></div>
+      \${i<fnData.length-1?'<div class="fn-arrow">›</div>':''}
+    </div>\`).join("");
 
-document.getElementById("t-pat").textContent = String(D.patterns.length).padStart(2,"0");
-document.getElementById("t-inv").textContent = String(D.inventory.length).padStart(2,"0");
+  document.getElementById("t-pat").textContent = String(D.patterns.length).padStart(2,"0");
+  document.getElementById("t-inv").textContent = String(D.inventory.length).padStart(2,"0");
+
+  // Strip + foot
+  const setText = (id,v)=>{const el=document.getElementById(id);if(el) el.textContent=v;};
+  setText("strip-sessions", D.totalSessions);
+  setText("strip-sweep", (D.generatedAt||'').split(',').pop().trim());
+  setText("strip-pending", D.pendingCount);
+  setText("strip-dead", D.deadCount);
+  setText("strip-stale", D.staleCount);
+  setText("strip-stage", D.stage);
+  setText("foot-gen", "generated "+D.generatedAt+" · plugin v"+D.pluginVersion);
+
+  // Hero tags rebuild (acceptRate / workingPaths / deadCount may shift)
+  const tags = document.getElementById("hero-tags");
+  if(tags){
+    const ar = D.pipeline.acceptRate, wp = D.pipeline.working;
+    const sig = ar>=50?'STRONG':ar>=25?'OK':'WEAK';
+    const pip = wp>0?'HEALTHY':'WARMING';
+    tags.innerHTML = '<span class="tag">SIGNAL <b>'+sig+'</b></span>'
+      +'<span class="tag">PIPELINE <b>'+pip+'</b></span>'
+      +(D.deadCount>0?'<span class="tag">CLEANUP <b>'+D.deadCount+'</b></span>':'');
+  }
+}
 
 document.querySelectorAll(".tab").forEach(btn=>{
   btn.addEventListener("click",()=>{
@@ -1167,10 +1222,11 @@ function buildMap(){
     }
   });
 
-  // Trigger entrance animation on next frame
-  requestAnimationFrame(()=>{
-    if(svg) svg.classList.add('play');
-  });
+  // Trigger entrance animation on first render only — silent updates after that
+  if(!window.__mapPlayed){
+    window.__mapPlayed = true;
+    requestAnimationFrame(()=>{ if(svg) svg.classList.add('play'); });
+  }
 }
 
 function buildSignals(){
@@ -1373,11 +1429,118 @@ function buildInventory(){
   \`;
 }
 
-buildOverview();
-buildMap();
-buildSignals();
-buildPatterns();
-buildInventory();
+function render(){
+  renderTop();
+  buildOverview();
+  buildMap();
+  buildSignals();
+  buildPatterns();
+  buildInventory();
+}
+
+render();
+
+// ── Live refresh ────────────────────────────────────────────
+(function(){
+  const REFRESH_MS = 60000;
+  const live    = document.getElementById('live');
+  const text    = document.getElementById('live-text');
+  const btnRef  = document.getElementById('live-refresh');
+  const btnTog  = document.getElementById('live-toggle');
+  if(!live) return;
+
+  let lastUpdate = Date.now();
+  let paused = false;
+  let inFlight = false;
+  let timer = null;
+
+  function setState(s){ live.dataset.state = s; }
+
+  function tick(){
+    const sec = Math.round((Date.now()-lastUpdate)/1000);
+    const remain = Math.max(0, Math.round((REFRESH_MS - (Date.now()-lastUpdate))/1000));
+    if(paused){
+      text.innerHTML = 'paused · <b>'+sec+'s</b> ago';
+    } else if(inFlight){
+      text.innerHTML = 'updating…';
+    } else {
+      text.innerHTML = 'live · <b>'+sec+'s</b> ago · next <b>'+remain+'s</b>';
+    }
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  async function refresh(){
+    if(inFlight) return;
+    inFlight = true;
+    setState('loading');
+    tick();
+    try{
+      const r = await fetch('/data', {cache:'no-store'});
+      if(!r.ok) throw new Error('http '+r.status);
+      const next = await r.json();
+      if(next && !next.error){
+        D = next;
+        render();
+        lastUpdate = Date.now();
+        live.classList.remove('live-flash');
+        // restart animation
+        void live.offsetWidth;
+        live.classList.add('live-flash');
+        setState(paused?'paused':'idle');
+      } else {
+        setState('error');
+      }
+    }catch(_){
+      setState('error');
+    }finally{
+      inFlight = false;
+      tick();
+    }
+  }
+
+  function schedule(){
+    clearTimeout(timer);
+    if(paused) return;
+    timer = setTimeout(async ()=>{ await refresh(); schedule(); }, REFRESH_MS);
+  }
+  schedule();
+
+  btnRef.addEventListener('click', async ()=>{
+    await refresh();
+    schedule();
+  });
+
+  btnTog.addEventListener('click', ()=>{
+    paused = !paused;
+    btnTog.textContent = paused ? '▶' : '❚❚';
+    btnTog.title = paused ? 'Resume auto-refresh' : 'Pause auto-refresh';
+    if(paused){
+      clearTimeout(timer);
+      setState('paused');
+    } else {
+      setState('idle');
+      schedule();
+    }
+    tick();
+  });
+
+  // Pause polling when tab is hidden, refresh when it comes back
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      clearTimeout(timer);
+    } else if(!paused){
+      refresh().then(schedule);
+    }
+  });
+
+  // Keyboard shortcut: r = refresh, space = pause/resume
+  document.addEventListener('keydown', (e)=>{
+    if(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if(e.key === 'r' || e.key === 'R'){ btnRef.click(); }
+    else if(e.key === ' '){ e.preventDefault(); btnTog.click(); }
+  });
+})();
 </script>
 </body>
 </html>`;
@@ -1385,7 +1548,7 @@ buildInventory();
   return html;
 }
 
-module.exports = { renderDashboard };
+module.exports = { renderDashboard, computeData };
 
 if (require.main === module) {
   process.stdout.write('dashboard.js is now a module — use server.js to serve\n');
