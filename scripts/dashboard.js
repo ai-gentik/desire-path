@@ -2,8 +2,8 @@
 /**
  * desire-path: dashboard module — Observatory edition
  *
- * Exports renderDashboard() which reads all data files and returns
- * a self-contained HTML string. Used by server.js to serve live.
+ * Exports computeData() which reads all data files and returns
+ * a structured data object. Used by server.js to serve the /data endpoint.
  */
 
 const fs   = require('fs');
