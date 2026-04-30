@@ -42,10 +42,36 @@ async function main() {
   const { computeData } = require('./dashboard.js');
   const HTML_FILE = path.join(__dirname, 'dashboard.html');
 
+  const WATCHED = ['sessions.jsonl', 'latest-analysis.json', 'inventory.json']
+    .map(f => path.join(DIR, f));
+
+  const clients = new Set();
+
+  function broadcast() {
+    for (const res of clients) {
+      try { res.write('data: {"type":"update"}\n\n'); } catch {}
+    }
+  }
+
   fs.mkdirSync(DIR, { recursive: true });
+
+  for (const f of WATCHED) {
+    try { fs.watch(f, { persistent: false }, broadcast); } catch {}
+  }
 
   const server = http.createServer((req, res) => {
     if (req.url === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+    if (req.url === '/events') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write(':\n\n'); // keep-alive comment
+      clients.add(res);
+      req.on('close', () => clients.delete(res));
+      return;
+    }
     if (req.url === '/data' || req.url.startsWith('/data?')) {
       try {
         const data = computeData();
