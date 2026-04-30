@@ -138,4 +138,19 @@ Save to `~/.claude/desire-path/latest-analysis.json`:
 
 Cap `top_paths` at 5. If fewer than 5 patterns clear the thresholds, return fewer — never pad.
 
-After writing, print a concise human summary (≤8 lines): for each entry name the actual trigger, the count, the chosen artifact, and one-line rationale. Be specific; no generic advice.
+## Validation (mandatory — do not skip)
+
+After writing `latest-analysis.json`, immediately read it back and verify:
+
+1. The file exists and is valid JSON.
+2. `_generated_by === "pattern-detector"` (not `"checker-local"` or any other value).
+3. `_generated_at` is within the last 60 seconds.
+4. `top_paths` is an array (may be empty, but must be present).
+
+If any check fails:
+- Retry the write once.
+- Re-read and re-check.
+- If still failing, stop and output: `[pattern-detector] ERROR: failed to write latest-analysis.json — validation failed after retry. Check file permissions or disk space.`
+- Do NOT print the human summary. Do NOT silently claim success.
+
+Only once validation passes, print a concise human summary (≤8 lines): for each entry name the actual trigger, the count, the chosen artifact, and one-line rationale. Be specific; no generic advice.
