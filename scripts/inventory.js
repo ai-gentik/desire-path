@@ -165,6 +165,15 @@ function scanHooks() {
   return results;
 }
 
+// ── Kept artifacts ───────────────────────────────────────────────────────────
+
+function loadKept() {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(DIR, 'kept.json'), 'utf8'));
+    return new Set((data.artifacts || []).map(a => a.name));
+  } catch { return new Set(); }
+}
+
 // ── Cross with usage data ─────────────────────────────────────────────────────
 
 function loadUsage() {
@@ -234,13 +243,20 @@ try {
   if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
 
   const usage     = loadUsage();
+  const kept      = loadKept();
   const skills    = scanSkills();
   const agents    = scanAgents();
   const hooks     = scanHooks();
   const all       = [...skills, ...agents, ...hooks];
 
-  // Attach classification to each artifact
-  const enriched = all.map(a => ({ ...a, ...classify(a, usage) }));
+  // Attach classification to each artifact; override status for kept artifacts
+  const enriched = all.map(a => {
+    const c = classify(a, usage);
+    if (kept.has(a.name) && (c.status === 'dead' || c.status === 'stale')) {
+      return { ...a, ...c, status: 'kept', verdict: 'kept (explicitly retained)', action: null };
+    }
+    return { ...a, ...c };
+  });
 
   const dead   = enriched.filter(a => a.status === 'dead');
   const stale  = enriched.filter(a => a.status === 'stale');

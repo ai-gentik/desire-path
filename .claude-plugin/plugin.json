@@ -1,6 +1,6 @@
 {
   "name": "desire-path",
-  "version": "2.3.6",
+  "version": "2.3.7",
   "description": "Silent background observer. Watches your Claude Code patterns and surfaces shortcuts you didn't know you were cutting — like desire paths in grass.",
   "author": { "name": "Jordy" },
   "keywords": ["patterns", "shortcuts", "automation", "habits", "hooks"],

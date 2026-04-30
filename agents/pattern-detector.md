@@ -82,10 +82,12 @@ Skip patterns that match any of these — they create noise without value:
 8. **Agents for short flows.** If the average turn count is low or the subdomain isn't stable, an agent is overkill; suggest a skill or command instead.
 9. **Skills that duplicate a command's job** (or vice versa). Pick one based on the matrix above; never both.
 10. **Cosmetic patterns** (e.g. user often says "please") — ignore.
+11. **Habit-enforcement CLAUDE.md entries.** Don't suggest adding "always invoke skill X before doing Y" to CLAUDE.md. Skills are invoked on demand; enforcing habits via always-on context creates noise and gets dismissed. Only suggest CLAUDE.md additions for concrete, factual, project-specific context (paths, versions, constraints) — not behavioral reminders.
+12. **Multi-repo activity as friction.** If sessions span multiple unrelated repos, don't flag it as a cross-project context problem. Only flag context-switching as friction when you see direct evidence: sessions that open with orientation questions ("where were we?", "what did we do last time?") or zero-tool continuation prompts.
 
 ## Output
 
-Save to `~/.claude/desire-path/latest-analysis.json`:
+Use the **`Write` tool** to save to `~/.claude/desire-path/latest-analysis.json`. Do not use `ctx_execute`, `ctx_batch_execute`, or any MCP tool — they are denied in subagent contexts and the write will silently fail.
 
 ```json
 {
