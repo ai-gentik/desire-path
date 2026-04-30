@@ -39,7 +39,8 @@ async function main() {
     }
   }
 
-  const { renderDashboard, computeData } = require('./dashboard.js');
+  const { computeData } = require('./dashboard.js');
+  const HTML_FILE = path.join(__dirname, 'dashboard.html');
 
   fs.mkdirSync(DIR, { recursive: true });
 
@@ -60,12 +61,12 @@ async function main() {
       return;
     }
     try {
-      const html = renderDashboard();
+      const html = fs.readFileSync(HTML_FILE, 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end('Error rendering dashboard: ' + err.message);
+      res.end('Error serving dashboard: ' + err.message);
     }
   });
 
