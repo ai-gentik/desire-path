@@ -122,3 +122,5 @@ The biggest risk to adoption is suggestion noise. These items raise the signal-t
 | 20 | Pattern-detector outcome telemetry | trust | Medium | Medium | — |
 | 21 | Per-pattern surface threshold tuning | trust | Low | Medium | — |
 | 22 | Team-share guidance for project-scoped artifacts | pave | Low | Medium | — |
+| 23 | SSE-reactive dashboard (static HTML + server push) | infra | Medium | High | ✅ done |
+| 24 | Filter resolved patterns at write time in checker | trust | Low | High | ✅ done |
